@@ -1,22 +1,25 @@
 // CLASSIFICATION NOTICE: This file is UNCLASSIFIED
-package edu.utexas.arlut.ciads.repo;
-
-import static com.google.common.base.Predicates.in;
-import static com.google.common.base.Predicates.not;
-
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
+package edu.utexas.arlut.ciads.repo.nestedtransaction;
 
 import com.google.common.base.Function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Maps;
+import com.google.common.collect.*;
+import edu.utexas.arlut.ciads.repo.Keyed;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.lib.ObjectId;
 
+import java.util.Deque;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.google.common.base.Predicates.in;
+import static com.google.common.base.Predicates.not;
+import static com.google.common.collect.Queues.newArrayDeque;
+
 @Slf4j
-public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
+public class DataStore<T> extends Mergeable<T, Keyed<T>> {
 
     public static class NotInTransactionException extends RuntimeException {
     }
@@ -42,17 +45,17 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
 
     // start transaction, with a new transaction
     public Transaction beginTX() {
-        Transaction tx = tlTransaction.get();
-        if (null == tx) {
-            tx = new Transaction(this);
-            tlTransaction.set(tx);
-        }
+        Transaction tx = new Transaction(this, threadTransaction.get().peek());
+        threadTransaction.get().push(tx);
         return tx;
     }
 
     // get top-most transaction
-    public Transaction currentTX() {
-        return tlTransaction.get();
+    public Transaction<T> currentTX() {
+        if (!threadTransaction.get().isEmpty()) {
+            return threadTransaction.get().peek();
+        }
+        throw new NotInTransactionException();
     }
 
     // commit top-level transaction
@@ -65,20 +68,20 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
         currentTX().rollback();
     }
 
-    private Function<Keyed<Integer>, Keyed<Integer>> MAKE_IMMUTABLE = new Function<Keyed<Integer>, Keyed<Integer>>() {
+    private Function<Keyed<T>, Keyed<T>> MAKE_IMMUTABLE = new Function<Keyed<T>, Keyed<T>>() {
         @Override
-        public Keyed<Integer> apply(Keyed<Integer> k) {
+        public Keyed<T> apply(Keyed<T> k) {
             return k.immutable();
         }
     };
     // merge only (or last remaining) transaction from stack into baseline
     @Override
-    protected void merge(Map<Integer, Keyed<Integer>> added, Set<Integer> deleted) {
-//    public void merge(Map<Integer, Keyed> added, Set<Integer> deleted) {
+    protected void merge(Map<T, Keyed<T>> added, Set<T> deleted) {
+//    public void merge(Map<T, Keyed> added, Set<T> deleted) {
         log.info("merge into baseline");
 
-        Index i = Index.of();
-        Map<Integer, Keyed<Integer>> f = Maps.filterKeys(added, not(in(deleted)));
+        Index i = Index.of(index);
+        Map<T, Keyed<T>> f = Maps.filterKeys(added, not(in(deleted)));
 
         i.remove(deleted);
         i.addAll(Maps.transformValues(added, Keyed.MAKE_IMMUTABLE));
@@ -100,18 +103,21 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
 //        }
 
     }
+    void popTX() {
+        threadTransaction.get().pop();
+    }
     // =================================
 //    public void add(T key, Keyed<T> val) {
-//        if (tlTransaction.get().isEmpty())
+//        if (threadTransaction.get().isEmpty())
 //            throw new NotInTransactionException();
-//        tlTransaction.get().peek().add(key, val);
+//        threadTransaction.get().peek().add(key, val);
 //    }
 //    public void remove(T key) {
-//        if (tlTransaction.get().isEmpty())
+//        if (threadTransaction.get().isEmpty())
 //            throw new NotInTransactionException();
-//        tlTransaction.get().peek().remove(key);
+//        threadTransaction.get().peek().remove(key);
 //    }
-    protected <T extends Keyed<Integer>> T _get(Integer key) {
+    protected <T1 extends Keyed<T>> T1 _get(T key) {
 //        dumpMap("{} => {}", index);
         index.dump();
 //        String path = "K/" + key;
@@ -119,27 +125,29 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
 //        log.info("_get {} {}", path, oid);
         // TODO: handle null oid here...
 //        return (T1)cache.getIfPresent(oid);
-        return (T)index.get(key);
+        return (T1)index.get(key);
     }
 
     @Override
-        public <T extends Keyed<Integer>> T get(Integer key) {
-        return tlTransaction.get().get(key);
+    public <T1 extends Keyed<T>> T1 get(T key) {
+        if (!threadTransaction.get().isEmpty())
+            return (T1)currentTX().get(key);
+        return _get(key);
     }
     @Override
-    public <T extends Keyed<Integer>> T getMutable(Integer key) {
+    public <T1 extends Keyed<T>> T1 getMutable(T key) {
         log.info("baseline lookup {}", key);
-        return (T)tlTransaction.get().getMutable(key);
+        return (T1)currentTX().getMutable(key);
     }
 
-    Iterable<Keyed<Integer>> _list() {
+    private Iterable<Keyed<T>> _list() {
         return index.list();
     }
     @Override
-    public Iterable<Keyed<Integer>> list() {
-//        if (!tlTransaction.get())
-//            return currentTX().list();
-        return tlTransaction.get().list();
+    public Iterable<Keyed<T>> list() {
+        if (!threadTransaction.get().isEmpty())
+            return currentTX().list();
+        return _list();
     }
     // =================================
 
@@ -158,11 +166,10 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
     private final Cache<ObjectId, Keyed> cache = CacheBuilder.newBuilder()
                                                              .maximumSize(2000)
                                                              .build();
-    private ThreadLocal<Transaction> tlTransaction = new ThreadLocal<Transaction>() {
+    private ThreadLocal<Deque<Transaction<T>>> threadTransaction = new ThreadLocal<Deque<Transaction<T>>>() {
         @Override
-        protected Transaction initialValue() {
-            //return Transaction();
-            return new Transaction(DataStore.this);
+        protected Deque<Transaction<T>> initialValue() {
+            return newArrayDeque();
         }
     };
 

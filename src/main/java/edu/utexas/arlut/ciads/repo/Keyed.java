@@ -10,7 +10,7 @@ public abstract class Keyed<T> {
     public abstract Keyed immutable();
     public abstract Keyed mutable();
     public abstract String getType();
-    String path() {
+    public String path() {
         return getType() + "/" + id(); // joiner.join(getType(), id());
     }
 

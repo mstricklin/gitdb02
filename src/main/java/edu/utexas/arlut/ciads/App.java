@@ -1,20 +1,15 @@
 package edu.utexas.arlut.ciads;
 
-import com.google.common.base.Splitter;
 import edu.utexas.arlut.ciads.repo.DataStore;
 import edu.utexas.arlut.ciads.repo.Keyed;
 import edu.utexas.arlut.ciads.repo.Transaction;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
-
-import static com.google.common.collect.Lists.newArrayList;
-
 @Slf4j
 public class App {
 
-    static DataStore ds = new DataStore<Integer>(null);
+    static DataStore ds = new DataStore(null);
     public static void main(String[] args) {
 
         try(Transaction tx = ds.beginTX()) {
@@ -24,7 +19,7 @@ public class App {
             tx.add(2, k2);
             tx.dump();
             ds.dump();
-            a();
+//            a();
             tx.commit();
         }
         ds.dump();
