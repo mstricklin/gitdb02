@@ -1,9 +1,7 @@
 // CLASSIFICATION NOTICE: This file is UNCLASSIFIED
 package edu.utexas.arlut.ciads.repo;
 
-import static com.google.common.base.Predicates.in;
-import static com.google.common.base.Predicates.not;
-
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,30 +9,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.base.Function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Maps;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
-public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
+public class DataStore extends Mergeable<Integer, Keyed> {
 
-    public static class NotInTransactionException extends RuntimeException {
-    }
-
-    public static class NotInnermostTransactionException extends RuntimeException {
-    }
     // =================================
 
-    public DataStore(ObjectId head) {
+    public DataStore(RevCommit rev) throws GitAPIException {
         // TODO: get the right index...
-        log.info("Datastore startup");
+        log.info("Datastore startup from {}", rev.abbreviate(10).name());
+        revision = rev;
+        index = Index.of(rev.getTree());
+        repo = GitRepository.instance();
     }
 
     public void shutdown() {
         log.info("Shutting down datastore");
     }
     public void dump() {
-        log.info("baseline");
+        log.info("dump {}", this);
         index.dump();
         for (Map.Entry<ObjectId, Keyed> e : cache.asMap().entrySet())
             log.info("\t{} => {}", e.getKey().name(), e.getValue());
@@ -65,24 +62,48 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
         currentTX().rollback();
     }
 
-    private Function<Keyed<Integer>, Keyed<Integer>> MAKE_IMMUTABLE = new Function<Keyed<Integer>, Keyed<Integer>>() {
+    private Function<Keyed, Keyed> MAKE_IMMUTABLE = new Function<Keyed, Keyed>() {
         @Override
-        public Keyed<Integer> apply(Keyed<Integer> k) {
+        public Keyed apply(Keyed k) {
             return k.immutable();
         }
     };
     // merge only (or last remaining) transaction from stack into baseline
     @Override
-    protected void merge(Map<Integer, Keyed<Integer>> added, Set<Integer> deleted) {
-//    public void merge(Map<Integer, Keyed> added, Set<Integer> deleted) {
+    protected void merge(Map<Integer, Keyed> added, Set<Integer> deleted) {
         log.info("merge into baseline");
 
-        Index i = Index.of();
-        Map<Integer, Keyed<Integer>> f = Maps.filterKeys(added, not(in(deleted)));
+        // make each immutable
+        // put each object in the repo
+        // cache each object in the cache
+        // delete from index
+        // add to index
+        try {
+            for (Keyed k : added.values()) {
+                ObjectId oid = repo.insert(k);
+                log.info("Added {} {}", k, oid.abbreviate(10).name());
+            }
+            index.addAll(added);
+        } catch (IOException e) {
 
-        i.remove(deleted);
-        i.addAll(Maps.transformValues(added, Keyed.MAKE_IMMUTABLE));
-        index = i;
+        }
+
+//        Index i = Index.of(index);
+//        Map<Integer, Keyed> f = Maps.filterKeys(added, not(in(deleted)));
+        // we should be able to trust that none of deleted are in added
+
+//        try {
+//            for (Keyed k : added.values()) {
+//                ObjectId oid = repo.insert(k);
+//                i.put(k.path, oid);
+//            }
+//        } catch (IOException e) {
+//            log.error("Error persisting", e);
+//        }
+
+//        i.remove(deleted);
+//        i.addAll(Maps.transformValues(added, Keyed.MAKE_IMMUTABLE));
+//        index = i;
 
 
 
@@ -111,49 +132,50 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
 //            throw new NotInTransactionException();
 //        tlTransaction.get().peek().remove(key);
 //    }
-    protected <T extends Keyed<Integer>> T _get(Integer key) {
-//        dumpMap("{} => {}", index);
+    protected <T extends Keyed> T _get(Integer key, Class<?> clazz) {
         index.dump();
-//        String path = "K/" + key;
-//        ObjectId oid = index.get(path);
-//        log.info("_get {} {}", path, oid);
         // TODO: handle null oid here...
-//        return (T1)cache.getIfPresent(oid);
-        return (T)index.get(key);
+        Keyed.Path p = Keyed.Path.of(key, clazz.getSimpleName());
+        ObjectId oid = null;
+        try {
+            oid = index.get(p);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return (T) cache.getIfPresent(oid);
     }
 
     @Override
-        public <T extends Keyed<Integer>> T get(Integer key) {
-        return tlTransaction.get().get(key);
+        public <T extends Keyed> T get(Integer key, Class<?> clazz) {
+        return tlTransaction.get().get(key, clazz);
     }
     @Override
-    public <T extends Keyed<Integer>> T getMutable(Integer key) {
+    public <T extends Keyed> T getMutable(Integer key, Class<?> clazz) {
         log.info("baseline lookup {}", key);
-        return (T)tlTransaction.get().getMutable(key);
+        return (T)tlTransaction.get().getMutable(key, clazz);
     }
 
-    Iterable<Keyed<Integer>> _list() {
+    Iterable<Keyed> _list() {
         return index.list();
     }
     @Override
-    public Iterable<Keyed<Integer>> list() {
-//        if (!tlTransaction.get())
-//            return currentTX().list();
+    public Iterable<Keyed> list() {
         return tlTransaction.get().list();
     }
     // =================================
 
     @Override
     public String toString() {
-        return "Baseline";
+        return "DataStore from "+ revision.abbreviate(10).name();
     }
 
     // =================================
 
+    GitRepository repo;
     private static final AtomicInteger objectCounter = new AtomicInteger(0);
 
     //    private final Map<String, ObjectId> index = newHashMap();
-    Index index = Index.of();
+    Index index;
     // TODO: parameterize maximumSize
     private final Cache<ObjectId, Keyed> cache = CacheBuilder.newBuilder()
                                                              .maximumSize(2000)
@@ -161,10 +183,10 @@ public class DataStore extends Mergeable<Integer, Keyed<Integer>> {
     private ThreadLocal<Transaction> tlTransaction = new ThreadLocal<Transaction>() {
         @Override
         protected Transaction initialValue() {
-            //return Transaction();
             return new Transaction(DataStore.this);
         }
     };
+    final RevCommit revision;
 
 
 }

@@ -1,0 +1,4 @@
+
+need impl w/in DTO because a relationship may be added w/o
+ a DTO knowing, so may change beneath dependent code
+

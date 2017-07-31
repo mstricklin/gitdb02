@@ -15,12 +15,12 @@ import com.google.common.collect.Iterables;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class Transaction extends Mergeable<Integer, Keyed<Integer>> implements Closeable {
+public class Transaction extends Mergeable<Integer, Keyed> implements Closeable {
     Transaction(final DataStore ds) {
         this.ds = ds;
     }
 
-    public void add(Integer key, Keyed<Integer> val) {
+    public void add(Integer key, Keyed val) {
         deleted.remove(key);
         added.put(key, val);
     }
@@ -36,21 +36,16 @@ public class Transaction extends Mergeable<Integer, Keyed<Integer>> implements C
         deleted.clear();
     }
     public void commit() {
-//        Transaction<T> tx = ds.currentTX();
-        if (ds.currentTX() != this) // yes, !=
-            throw new DataStore.NotInnermostTransactionException();
         ds.merge(added, deleted);
         reset();
     }
 
     public void rollback() {
-        if (ds.currentTX() != this) // yes, !=
-            throw new DataStore.NotInnermostTransactionException();
         reset();
     }
 
     @Override
-    protected void merge(Map<Integer, Keyed<Integer>> added, Set<Integer> deleted) {
+    protected void merge(Map<Integer, Keyed> added, Set<Integer> deleted) {
         log.info("merge into {}", this);
         for (Integer k : deleted)
             this.added.remove(k);
@@ -59,38 +54,38 @@ public class Transaction extends Mergeable<Integer, Keyed<Integer>> implements C
     }
 
     @Override
-    public <T extends Keyed<Integer>> T get(Integer key) {
+    public <T extends Keyed> T get(Integer key, Class<?> clazz) {
         if (deleted.contains(key))
             return null;
         if (added.containsKey(key))
             return (T) added.get(key);
-        return (T) ds._get(key);
+        return (T) ds._get(key, clazz);
     }
 
     @Override
-    public <Integer1 extends Keyed<Integer>> Integer1 getMutable(Integer key) {
+    public <T extends Keyed> T getMutable(Integer key, Class<?> clazz) {
         log.info("tx {} getMutable", this);
-        Keyed k = get(key);
+        Keyed k = get(key, clazz);
         log.info("tx {} getMutable got {}", this, k);
         if (null == k)
             return null;
         Keyed k2 = k.mutable();
         add(key, k2);
-        return (Integer1) k2;
+        return (T) k2;
     }
 
-    private static Predicate<Keyed<?>> IN(final Set<?> deleted) {
-        return new Predicate<Keyed<?>>() {
+    private static Predicate<Keyed> IN(final Set<?> deleted) {
+        return new Predicate<Keyed>() {
             @Override
-            public boolean apply(Keyed<?> tKeyed) {
-                return deleted.contains(tKeyed.id());
+            public boolean apply(Keyed tKeyed) {
+                return deleted.contains(tKeyed.key());
             }
         };
     }
 
     @Override
-    public Iterable<Keyed<Integer>> list() {
-        Iterable<Keyed<Integer>> it = Iterables.filter(ds._list(), IN(deleted));
+    public Iterable<Keyed> list() {
+        Iterable<Keyed> it = Iterables.filter(ds._list(), IN(deleted));
         return Iterables.concat(it, added.values());
     }
 
@@ -113,7 +108,7 @@ public class Transaction extends Mergeable<Integer, Keyed<Integer>> implements C
     private static final AtomicInteger cnt = new AtomicInteger(0);
     private final int id = cnt.getAndIncrement();
     private final DataStore ds;
-    private final Map<Integer, Keyed<Integer>> added = newHashMap();
+    private final Map<Integer, Keyed> added = newHashMap();
     private final Set<Integer> deleted = newHashSet();
 
 

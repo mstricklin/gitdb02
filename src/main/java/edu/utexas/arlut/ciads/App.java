@@ -1,21 +1,53 @@
 package edu.utexas.arlut.ciads;
 
 import edu.utexas.arlut.ciads.repo.DataStore;
+import edu.utexas.arlut.ciads.repo.GitRepository;
 import edu.utexas.arlut.ciads.repo.Keyed;
 import edu.utexas.arlut.ciads.repo.Transaction;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Tree;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.revwalk.RevWalk;
+
+import java.io.IOException;
+import java.util.Map;
+
+import static com.google.common.collect.Maps.newHashMap;
+import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
 
 @Slf4j
 public class App {
 
-    static DataStore ds = new DataStore(null);
-    public static void main(String[] args) {
+    static DataStore ds;
+    public static final String BASELINE_TAG = "baseline";
 
-        try(Transaction tx = ds.beginTX()) {
+    static Map<String, RevCommit> baselines = newHashMap();
+
+    public static void main(String[] args) throws GitAPIException, IOException {
+        GitRepository gr = GitRepository.init("t.git");
+
+        Ref baselineTagOnly = gr.getTag(BASELINE_TAG);
+        ObjectId baselineOID = baselineTagOnly.getPeeledObjectId();
+        RevWalk revWalk = new RevWalk( gr.repo() );
+        RevCommit baselineCommit = revWalk.parseCommit( baselineOID );
+        baselines.put(BASELINE_TAG, baselineCommit);
+        revWalk.dispose();
+        log.info("baselineCommit {}", baselineCommit.abbreviate(10).name());
+
+
+        ds = new DataStore(baselineCommit);
+
+        try (Transaction tx = ds.beginTX())
+        {
             MutableK k1 = new MutableK(1, "one0", "one1", "one2");
             tx.add(1, k1);
-            MutableK k2 = new MutableK(1, "two0", "two1", "two2");
+            MutableK k2 = new MutableK(2, "two0", "two1", "two2");
             tx.add(2, k2);
             tx.dump();
             ds.dump();
@@ -24,18 +56,24 @@ public class App {
         }
         ds.dump();
 
-        log.info("");
-        try(Transaction tx = ds.beginTX()) {
-            MutableK k1 = new MutableK(5, "five0", "five1", "five2");
-            tx.add(5, k1);
-            MutableK k2 = new MutableK(6, "six0", "six1", "six2");
-            tx.add(6, k2);
-            tx.remove(3);
-            tx.dump();
-            ds.dump();
-            tx.commit();
-        }
-        ds.dump();
+//        ObjectId treeId = ObjectId.fromString("434943a8265129a744745e5d12fa2625a784b283");
+//        Tree t = new Tree(gr.repo(), treeId, null);
+
+//        log.info("");
+//        try (
+//                Transaction tx = ds.beginTX())
+//
+//        {
+//            MutableK k1 = new MutableK(5, "five0", "five1", "five2");
+//            tx.add(5, k1);
+//            MutableK k2 = new MutableK(6, "six0", "six1", "six2");
+//            tx.add(6, k2);
+//            tx.remove(3);
+//            tx.dump();
+//            ds.dump();
+//            tx.commit();
+//        }
+//        ds.dump();
 
 //        try (Transaction tx0 = ds.beginTX()) {
 //            MutableK k1 = new MutableK(1, "one0", "one1", "one2");
@@ -84,6 +122,7 @@ public class App {
 
         ds.shutdown();
     }
+
     // =================================
     static void a() {
         try (Transaction tx = ds.beginTX()) {
@@ -94,22 +133,20 @@ public class App {
         }
     }
 
-    abstract static class K extends Keyed<Integer> {
-        static String getPath(Integer id) {
-            return "K/" + id;
+    abstract static class K extends Keyed {
+        static String getPath(Integer key) {
+            return "K/" + key;
         }
-        protected K(Integer id) {
-            this.id = id;
+
+        protected K(Integer key) {
+            super(key);
         }
-        @Override
-        public Integer id() {
-            return id;
-        }
+
         @Override
         public String getType() {
             return "K";
         }
-        protected final int id;
+
         @Override
         public boolean equals(Object other) {
             log.info("equals {}.equals({})", this, other);
@@ -119,24 +156,27 @@ public class App {
                 return false;
             if (!other.getClass().equals(getClass()))
                 return false;
-            return id == ((K)other).id;
+            return key == ((K) other).key;
         }
     }
 
     @ToString
     public static class ImmutableK extends K {
         ImmutableK(MutableK mk) {
-            super(mk.id);
+            super(mk.key);
             this.s0 = mk.s0;
             this.s1 = mk.s1;
             this.s2 = mk.s2;
         }
+
         public Keyed immutable() {
             return this;
         }
+
         public Keyed mutable() {
             return new MutableK(this);
         }
+
         final String s0;
         final String s1;
         final String s2;
@@ -150,20 +190,24 @@ public class App {
             this.s1 = s1;
             this.s2 = s2;
         }
+
         MutableK(ImmutableK ik) {
-            super(ik.id);
+            super(ik.key);
             this.s0 = ik.s0;
             this.s1 = ik.s1;
             this.s2 = ik.s2;
         }
+
         @Override
         public Keyed immutable() {
             return new ImmutableK(this);
         }
+
         @Override
         public Keyed mutable() {
             return this;
         }
+
         String s0;
         String s1;
         String s2;

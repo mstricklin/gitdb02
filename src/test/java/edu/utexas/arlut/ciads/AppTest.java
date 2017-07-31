@@ -16,6 +16,7 @@ import edu.utexas.arlut.ciads.repo.DataStore;
 import edu.utexas.arlut.ciads.repo.Keyed;
 import edu.utexas.arlut.ciads.repo.Transaction;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.hamcrest.collection.IsEmptyCollection;
 import org.junit.Test;
 
@@ -24,7 +25,7 @@ import org.junit.Test;
 @Slf4j
 public class AppTest {
     @Test
-    public void testCreatedDS() {
+    public void testCreatedDS() throws GitAPIException {
         DataStore ds = new DataStore(null);
         App.MutableK k1 = new App.MutableK(1, "one0", "one1", "one2");
         App.MutableK k2 = new App.MutableK(1, "two0", "two1", "two2");

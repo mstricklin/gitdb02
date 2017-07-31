@@ -1,15 +1,15 @@
-// CLASSIFICATION NOTICE: This file is UNCLASSIFIED
 package edu.utexas.arlut.ciads;
 
 import edu.utexas.arlut.ciads.repo.Keyed;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+
 // =================================
 @ToString
 @Slf4j
-public class AFrame {
-    public AFrame(int id, String s0, String s1, String s2) {
+public class BFrame {
+    public BFrame(int id, String s0, String s1, String s2) {
         this.id = id;
         i = new Impl(id, s0, s1, s2);
     }
@@ -19,7 +19,7 @@ public class AFrame {
         // return getImmutableImpl(id).s0;
         return i.s0;
     }
-    public AFrame setS0(String s0) {
+    public BFrame setS0(String s0) {
         // return getImpl(id).s0;
         i.s0 = s0;
         return this;
@@ -28,7 +28,7 @@ public class AFrame {
         // return getImmutableImpl(id).s1;
         return i.s1;
     }
-    public AFrame setS1(String s1) {
+    public BFrame setS1(String s1) {
         // return getImpl(id).s1;
         i.s1 = s1;
         return this;
