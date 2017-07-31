@@ -3,9 +3,9 @@ package edu.utexas.arlut.ciads.repo;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
 import org.eclipse.jgit.lib.*;
-import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 
 import java.io.File;
 import java.io.IOException;
@@ -77,13 +77,29 @@ public class GitRepository {
         return rdb.getRef(refName);
     }
 
+    public RevCommit getCommit(String name) throws IOException {
+        ObjectId oid = getTagOID(name);
+        RevWalk revWalk = new RevWalk(repo);
+        RevCommit baselineCommit = revWalk.parseCommit(oid);
+        revWalk.dispose();
+        return baselineCommit;
+    }
     public Ref getRef(String refName) throws IOException {
         return rdb.getRef(refName);
     }
 
-    public Ref getTag(String refName) throws IOException {
-        Ref r = repo.getTags().get(refName);
-        return repo.getTags().get(refName);
+    public ObjectId getTagOID(String tagName) throws IOException {
+        // TODO: do I need a peeledOID here?
+        // 'resolve' is slow...
+        return repo.resolve(tagName);
+//        Map<String, Ref> m = repo.getTags();
+//        return repo.getTags().get(tagName);
+    }
+
+    public Ref getTag(String tagName) throws IOException {
+//        return repo.resolve(tagName);
+//        Map<String, Ref> m = repo.getTags();
+        return repo.getTags().get(tagName);
     }
 
     public Repository repo() {
@@ -94,19 +110,35 @@ public class GitRepository {
         return serializer;
     }
 
-    public ObjectId insert(Keyed k) throws IOException {
+    public ObjectId persist(IKeyed k) throws IOException {
         byte[] b = serializer.serialize(k);
-        return insertBlob(b);
+        return persistBlob(b);
     }
 
-    public ObjectId insertBlob(byte[] b) throws IOException {
-        return insertObject(OBJ_BLOB, b);
+    private static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("amt.system", "amt.system@arlut.utexas.edu");
+    public static PersonIdent systemIdent() {
+        return SYSTEM_PERSON_IDENT;
     }
 
-    public ObjectId insertObject(int type, byte[] b) throws IOException {
+    public CloseableObjectInserter getInserter() {
+        return tlCOI.get();
+    }
+    public ObjectId persistTree(TreeFormatter tf) throws IOException {
+        try (CloseableObjectInserter coi = tlCOI.get()) {
+            ObjectId oid = coi.insert(tf);
+            log.debug("persistObject {}", oid);
+            return oid;
+        }
+    }
+
+    public ObjectId persistBlob(byte[] b) throws IOException {
+        return persistObject(OBJ_BLOB, b);
+    }
+
+    public ObjectId persistObject(int type, byte[] b) throws IOException {
         try (CloseableObjectInserter coi = tlCOI.get()) {
             ObjectId oid = coi.insert(type, b);
-            log.debug("insertObject {}", oid);
+            log.debug("persistObject {}", oid);
             return oid;
         }
     }

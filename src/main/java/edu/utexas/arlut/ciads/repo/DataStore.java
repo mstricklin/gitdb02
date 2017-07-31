@@ -1,26 +1,55 @@
 // CLASSIFICATION NOTICE: This file is UNCLASSIFIED
 package edu.utexas.arlut.ciads.repo;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Sets.newHashSet;
+import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.CommitBuilder;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
-public class DataStore extends Mergeable<Integer, Keyed> {
+public class DataStore {
 
+    private static LoadingCache<RevCommit, DataStore> stores
+            = CacheBuilder.newBuilder()
+                          .maximumSize(1000)
+                          .build(
+                                  new CacheLoader<RevCommit, DataStore>() {
+                                      public DataStore load(RevCommit rev) {
+                                          return new DataStore(rev);
+                                      }
+                                  });
     // =================================
+    public static DataStore of(final RevCommit rev) {
+        checkNotNull(rev);
+        try {
+            return stores.get(rev);
+        } catch (ExecutionException e) {
+            log.error("Can't instantiate a datastore for rev {}", rev);
+            log.error("", e);
+        }
+        return null;
+    }
 
-    public DataStore(RevCommit rev) throws GitAPIException {
-        // TODO: get the right index...
+    private DataStore(RevCommit rev) {
         log.info("Datastore startup from {}", rev.abbreviate(10).name());
         revision = rev;
         index = Index.of(rev.getTree());
@@ -32,34 +61,67 @@ public class DataStore extends Mergeable<Integer, Keyed> {
     }
     public void dump() {
         log.info("dump {}", this);
+        log.info("\tpending");
+        dumpMap("\t{} => {}", added);
         index.dump();
-        for (Map.Entry<ObjectId, Keyed> e : cache.asMap().entrySet())
-            log.info("\t{} => {}", e.getKey().name(), e.getValue());
     }
 
-    // start transaction, with a new transaction
-    public Transaction beginTX() {
-        Transaction tx = tlTransaction.get();
-        if (null == tx) {
-            tx = new Transaction(this);
-            tlTransaction.set(tx);
+    public static class Transaction implements AutoCloseable {
+        private Transaction(DataStore ds) {
+            this.ds = ds;
         }
-        return tx;
+        private final DataStore ds;
+        @Override
+        public void close() {
+            ds.rollback();
+        }
+        public void commit() {
+            ds.commit();
+        }
+        public void rollback() {
+            ds.rollback();
+        }
     }
-
-    // get top-most transaction
-    public Transaction currentTX() {
-        return tlTransaction.get();
+    public Transaction beginTX() {
+        return new Transaction(this);
     }
-
+    // =================================
+    private void reset() {
+        added.clear();
+        deleted.clear();
+    }
     // commit top-level transaction
     public void commit() {
-        currentTX().commit();
+        try {
+            for (Integer k : deleted) {
+                index.remove(k);
+            }
+            for (IKeyed<Integer> k : added.values()) {
+                index.add(repo.persist(k), k.key());
+            }
+            ObjectId treeId = index.commit();
+            CommitBuilder commit = new CommitBuilder();
+            commit.setCommitter(GitRepository.systemIdent());
+            commit.setAuthor(GitRepository.systemIdent());
+//        commit.setMessage(message);
+            commit.setParentIds(revision.getId());
+            commit.setTreeId(treeId);
+            try (CloseableObjectInserter coi = repo.getInserter()) {
+                ObjectId commitId = coi.insert(commit);
+                log.info("Commit: {}", commitId);
+            }
+        } catch (IOException e) {
+            log.info("Error commiting", e);
+            // TODO: how to reset?
+        }
+
+
+        reset();
     }
 
     // rollback top-level transaction
     public void rollback() {
-        currentTX().rollback();
+        reset();
     }
 
     private Function<Keyed, Keyed> MAKE_IMMUTABLE = new Function<Keyed, Keyed>() {
@@ -69,8 +131,7 @@ public class DataStore extends Mergeable<Integer, Keyed> {
         }
     };
     // merge only (or last remaining) transaction from stack into baseline
-    @Override
-    protected void merge(Map<Integer, Keyed> added, Set<Integer> deleted) {
+    private void merge(Map<Integer, IKeyed> added, Set<Integer> deleted) {
         log.info("merge into baseline");
 
         // make each immutable
@@ -79,94 +140,74 @@ public class DataStore extends Mergeable<Integer, Keyed> {
         // delete from index
         // add to index
         try {
-            for (Keyed k : added.values()) {
-                ObjectId oid = repo.insert(k);
+            for (IKeyed<Integer> k : added.values()) {
+                ObjectId oid = repo.persist(k);
+                index.add(oid, k.key());
                 log.info("Added {} {}", k, oid.abbreviate(10).name());
             }
-            index.addAll(added);
+//            index.addAll(added);
+            index.commit();
         } catch (IOException e) {
 
         }
-
-//        Index i = Index.of(index);
-//        Map<Integer, Keyed> f = Maps.filterKeys(added, not(in(deleted)));
-        // we should be able to trust that none of deleted are in added
-
-//        try {
-//            for (Keyed k : added.values()) {
-//                ObjectId oid = repo.insert(k);
-//                i.put(k.path, oid);
-//            }
-//        } catch (IOException e) {
-//            log.error("Error persisting", e);
-//        }
-
-//        i.remove(deleted);
-//        i.addAll(Maps.transformValues(added, Keyed.MAKE_IMMUTABLE));
-//        index = i;
-
-
-
-//        cache.invalidateAll(deleted);
-//        for (Keyed k : added.values()) {
-//            Keyed ik = k.immutable();
-//
-//            Serializer s = Serializer.of();
-//            String ser = s.serialize(ik);
-//            String path = ik.path();
-//            ObjectId oid = s.getSHA(ser);
-//            log.info("ObjectId {}", oid.name());
-//            index.put(path, oid);
-//            cache.put(oid, ik);
-//        }
-
     }
+
     // =================================
-//    public void add(T key, Keyed<T> val) {
-//        if (tlTransaction.get().isEmpty())
-//            throw new NotInTransactionException();
-//        tlTransaction.get().peek().add(key, val);
-//    }
-//    public void remove(T key) {
-//        if (tlTransaction.get().isEmpty())
-//            throw new NotInTransactionException();
-//        tlTransaction.get().peek().remove(key);
-//    }
-    protected <T extends Keyed> T _get(Integer key, Class<?> clazz) {
-        index.dump();
-        // TODO: handle null oid here...
-        Keyed.Path p = Keyed.Path.of(key, clazz.getSimpleName());
+    public void add(Proxied p) {
+        IKeyed<Integer> impl = p.impl();
+        deleted.remove(impl.key());
+        added.put(impl.key(), impl);
+    }
+    public void add(IKeyed<Integer> val) {
+        deleted.remove(val.key());
+        added.put(val.key(), val);
+    }
+    public void add(Integer key, IKeyed<Integer> val) {
+        deleted.remove(key);
+        added.put(key, val);
+    }
+    public void remove(Integer key) {
+        added.remove(key);
+        deleted.add(key);
+    }
+
+    private String getPath(Integer p) {
+        return p.toString();
+    }
+
+    public <T extends IKeyed> T get(Integer key, Class<?> clazz) {
+        if (deleted.contains(key))
+            return null;
+        if (added.containsKey(key))
+            return (T)added.get(key);
+        String p = getPath(key);
         ObjectId oid = null;
         try {
-            oid = index.get(p);
+            oid = index.get(key);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return (T) cache.getIfPresent(oid);
+        return (T)cache.getIfPresent(oid);
+    }
+    public <T extends IKeyed> T getForMutation(Integer key, Class<?> clazz) {
+        log.info("getForMutation {}", key);
+        IKeyed<Integer> k = get(key, clazz);
+        if (null == k)
+            return null;
+        IKeyed<Integer> k2 = k.copy();
+        add(key, k2);
+        return (T)k2;
     }
 
-    @Override
-        public <T extends Keyed> T get(Integer key, Class<?> clazz) {
-        return tlTransaction.get().get(key, clazz);
-    }
-    @Override
-    public <T extends Keyed> T getMutable(Integer key, Class<?> clazz) {
-        log.info("baseline lookup {}", key);
-        return (T)tlTransaction.get().getMutable(key, clazz);
-    }
-
-    Iterable<Keyed> _list() {
-        return index.list();
-    }
-    @Override
     public Iterable<Keyed> list() {
-        return tlTransaction.get().list();
+        // TODO...
+        return Collections.emptyList();
     }
     // =================================
 
     @Override
     public String toString() {
-        return "DataStore from "+ revision.abbreviate(10).name();
+        return "DataStore from " + revision.abbreviate(10).name();
     }
 
     // =================================
@@ -180,13 +221,13 @@ public class DataStore extends Mergeable<Integer, Keyed> {
     private final Cache<ObjectId, Keyed> cache = CacheBuilder.newBuilder()
                                                              .maximumSize(2000)
                                                              .build();
-    private ThreadLocal<Transaction> tlTransaction = new ThreadLocal<Transaction>() {
-        @Override
-        protected Transaction initialValue() {
-            return new Transaction(DataStore.this);
-        }
-    };
     final RevCommit revision;
+
+    private static final AtomicInteger cnt = new AtomicInteger(0);
+    private final int id = cnt.getAndIncrement();
+
+    private final Map<Integer, IKeyed> added = newHashMap();
+    private final Set<Integer> deleted = newHashSet();
 
 
 }

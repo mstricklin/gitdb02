@@ -1,4 +1,4 @@
-package edu.utexas.arlut.ciads;
+package edu.utexas.arlut.ciads.example;
 
 import lombok.extern.slf4j.Slf4j;
 
