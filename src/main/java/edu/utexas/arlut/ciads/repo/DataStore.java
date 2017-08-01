@@ -103,7 +103,6 @@ public class DataStore {
             CommitBuilder commit = new CommitBuilder();
             commit.setCommitter(GitRepository.systemIdent());
             commit.setAuthor(GitRepository.systemIdent());
-//        commit.setMessage(message);
             commit.setParentIds(revision.getId());
             commit.setTreeId(treeId);
             try (CloseableObjectInserter coi = repo.getInserter()) {

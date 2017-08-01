@@ -27,6 +27,7 @@ public class GitRepository {
             theRepo = new GitRepository(location);
         return theRepo;
     }
+
     public static GitRepository instance() {
         return theRepo;
     }
@@ -38,6 +39,22 @@ public class GitRepository {
         repo = git.getRepository();
         ObjectDatabase db = repo.getObjectDatabase();
         rdb = repo.getRefDatabase();
+    }
+
+    public void branch(ObjectId from, String branchName) {
+        try {
+//            RevCommit baseline = getCommit(fromTag+"^{}");
+
+            RefUpdate updateRef = repo.updateRef(Constants.R_HEADS + branchName);
+            log.info("updateRef {} {}", updateRef, updateRef.getOldObjectId());
+            log.info("baseline oid {}", from);
+            updateRef.setNewObjectId(from);
+            updateRef.setRefLogMessage("shazam", false);
+            updateRef.update();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public Ref getHead() {
@@ -79,11 +96,14 @@ public class GitRepository {
 
     public RevCommit getCommit(String name) throws IOException {
         ObjectId oid = getTagOID(name);
+        if (null == oid)
+            return null;
         RevWalk revWalk = new RevWalk(repo);
         RevCommit baselineCommit = revWalk.parseCommit(oid);
         revWalk.dispose();
         return baselineCommit;
     }
+
     public Ref getRef(String refName) throws IOException {
         return rdb.getRef(refName);
     }
@@ -110,12 +130,10 @@ public class GitRepository {
         return serializer;
     }
 
-    public ObjectId persist(IKeyed k) throws IOException {
-        byte[] b = serializer.serialize(k);
-        return persistBlob(b);
-    }
+
 
     private static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("amt.system", "amt.system@arlut.utexas.edu");
+
     public static PersonIdent systemIdent() {
         return SYSTEM_PERSON_IDENT;
     }
@@ -123,12 +141,18 @@ public class GitRepository {
     public CloseableObjectInserter getInserter() {
         return tlCOI.get();
     }
+
     public ObjectId persistTree(TreeFormatter tf) throws IOException {
         try (CloseableObjectInserter coi = tlCOI.get()) {
             ObjectId oid = coi.insert(tf);
             log.debug("persistObject {}", oid);
             return oid;
         }
+    }
+
+    public ObjectId persist(IKeyed k) throws IOException {
+        byte[] b = serializer.serialize(k);
+        return persistBlob(b);
     }
 
     public ObjectId persistBlob(byte[] b) throws IOException {

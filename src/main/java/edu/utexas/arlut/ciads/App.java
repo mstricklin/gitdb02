@@ -21,7 +21,12 @@ import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
 
 @Slf4j
 public class App {
-
+/*
+1. Set up baseline
+2. Try DirCache
+3. Non-trivial directory depth
+4. get() and put()
+ */
     static DataStore ds;
     public static final String BASELINE_TAG = "baseline";
 
@@ -36,8 +41,14 @@ public class App {
 
         RevCommit baseline = gr.getCommit(BASELINE_TAG+"^{}");
         context = baseline;
+        if (null == context) {
+            log.info("Null baseline context");
+            System.exit(1);
+        }
         // TODO: check on baseline existence, and prime if not
         log.info("Baseline {}", baseline.abbreviate(10).name());
+        gr.branch(baseline.getId(), "foo");
+
 
         ds = DataStore.of(getContext());
 

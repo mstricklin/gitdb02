@@ -32,6 +32,7 @@ public class Index {
         }
     }
 
+    // TODO: try DirCache!!!
     Index(RevTree baseline) {
         this.baselineTree = baseline;
         final GitRepository gr = GitRepository.instance();

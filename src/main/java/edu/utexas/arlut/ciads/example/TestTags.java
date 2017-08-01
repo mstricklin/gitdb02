@@ -1,4 +1,4 @@
-package edu.utexas.arlut.ciads;
+package edu.utexas.arlut.ciads.example;
 
 import edu.utexas.arlut.ciads.repo.DataStore;
 import edu.utexas.arlut.ciads.repo.GitRepository;
