@@ -1,133 +1,148 @@
 // CLASSIFICATION NOTICE: This file is UNCLASSIFIED
 package edu.utexas.arlut.ciads;
 
-import edu.utexas.arlut.ciads.repo.DataStore;
-import edu.utexas.arlut.ciads.repo.IKeyed;
-import edu.utexas.arlut.ciads.repo.Proxied;
+import edu.utexas.arlut.ciads.repo.*;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 // =================================
 @ToString
 @Slf4j
-public class FrameA implements Proxied {
-    public FrameA(Impl i) {
-        this.id = i.id;
-        this.i = i;
+@TypeValue(value = FrameA.TYPE_VALUE)
+public class FrameA implements Proxy {
+
+    public final String key;
+    public static final String TYPE_VALUE = "FrameA";
+
+    // create *
+    // read *
+    // readForUpdate *
+    // delete *
+    // list
+    public static Builder builder(String id) {
+        return new Builder(id);
     }
-    public FrameA(int id, String s0, String s1, String s2) {
-//        super(id);
-        this.id = id;
-        i = new Impl(id, s0, s1, s2);
+    public static class Builder {
+        private String id;
+        private String s0 = "";
+        private String s1 = "";
+        private String s2 = "";
+        private Builder(String id) {
+            this.id = id;
+        }
+        public Builder s0(String s0) {
+            this.s0 = s0;
+            return this;
+        }
+        public Builder s1(String s1) {
+            this.s1 = s1;
+            return this;
+        }
+        public Builder s2(String s2) {
+            this.s2 = s2;
+            return this;
+        }
+        public Impl build() {
+            return new Impl(id, s0, s1, s2);
+        }
     }
-    public static FrameA get(DataStore ds, int id) {
-        Impl i = ds.get(id, Impl.class);
-        return new FrameA(i);
+    public static FrameA create(String key) {
+        return new FrameA(key);
     }
+    private FrameA(String key) {
+        this.key = key;
+    }
+
 
     // =================================
     public String getS0() {
-        // return getImmutableImpl(id).s0;
-        return i.s0;
+        return impl().s0;
     }
     public FrameA setS0(String s0) {
-        // return getImpl(id).s0;
-        i.s0 = s0;
+        mutable().s0 = s0;
         return this;
     }
     public String getS1() {
-        // return getImmutableImpl(id).s1;
-        return i.s1;
+        return impl().s1;
     }
     public FrameA setS1(String s1) {
-        // return getImpl(id).s1;
-        i.s1 = s1;
+        mutable().s1 = s1;
         return this;
     }
     public String getS2() {
-        // return getImmutableImpl(id).s1;
-        return i.s2;
+        return impl().s2;
     }
     public FrameA setS2(String s2) {
-        // return getImpl(id).s1;
-        i.s2 = s2;
+        mutable().s2 = s2;
         return this;
     }
 
-    private String getType() {
-        return type;
+    @Override
+    public String getType() {
+        return TYPE_VALUE;
+    }
+    @Override
+    public String getKey() {
+        return key;
+    }
+    @Override
+    public String getPath() {
+        return StringUtil.path(TYPE_VALUE, key);
     }
 
-    public final int id;
-    public static final String type = FrameA.class.getSimpleName();
 
     Impl i;
     @Override
-    public IKeyed<Integer> impl() {
-//        return i.immutable();
-        return i;
+    public Impl impl() {
+        DataStore ds = RuntimeContext.tlInstance().getDS();
+        return (Impl)ds.getImpl(key, FrameA.class);
     }
     @Override
-    public IKeyed<Integer> mutable() {
-//        return i.mutable();
-        return i;
+    public Impl mutable() {
+        DataStore ds = RuntimeContext.tlInstance().getDS();
+        return (Impl)ds.getImplForMutation(key, FrameA.class);
     }
 
-    @ToString
-    public static class Impl extends Keyed {
-        int id;
-        String s0;
-        String s1;
-        String s2;
-        String __type = FrameA.type;
+    @Override
+    public Class<Impl> proxiedClass() {
+        return Impl.class;
+    }
 
-        Impl(int id, String s0, String s1, String s2) {
+    // this is a morally immutable class
+    @ToString
+    public static class Impl extends Proxied<FrameA> {
+        private String id;
+        private String s0;
+        private String s1;
+        private String s2;
+        private final String __type = FrameA.TYPE_VALUE;
+
+        // for serializer reconstruction
+        private Impl() {
+            super();
+        }
+
+        Impl(String id, String s0, String s1, String s2) {
             super(id);
             this.id = id;
             this.s0 = s0;
             this.s1 = s1;
             this.s2 = s2;
         }
-//        Impl(ImmutableImpl ii) {
-//            this(ii.id, ii.s0, ii.s1, ii.s2);
-//        }
-//        public Keyed mutable() { return this; }
-//        public Keyed immutable() { return new ImmutableImpl(this); }
 
         @Override
         public String getType() {
-            return FrameA.type;
+            return __type;
         }
         @Override
         public Impl copy() {
             return new Impl(id, s0, s1, s2);
         }
 
+        @Override
+        public FrameA proxyOf(String key) {
+            return new FrameA(key);
+        }
+
     }
-//    @ToString
-//    public static class ImmutableImpl extends Keyed {
-//        final int id;
-//        final String s0;
-//        final String s1;
-//        final String s2;
-//        String __type = FrameA.type;
-//
-//        ImmutableImpl(int id, String s0, String s1, String s2) {
-//            super(id);
-//            this.id = id;
-//            this.s0 = s0;
-//            this.s1 = s1;
-//            this.s2 = s2;
-//        }
-//        ImmutableImpl(Impl i) {
-//            this(i.id, i.s0, i.s1, i.s2);
-//        }
-//        public Keyed mutable() { return new Impl(this); }
-//        public Keyed immutable() { return this; }
-//        @Override
-//        public String getType() {
-//            return FrameA.type;
-//        }
-//    }
-    // =================================
 }

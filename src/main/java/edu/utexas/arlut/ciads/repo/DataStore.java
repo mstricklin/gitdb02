@@ -4,66 +4,110 @@ package edu.utexas.arlut.ciads.repo;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
+import static edu.utexas.arlut.ciads.repo.ExceptionHelper.createDataStoreCreateAccessException;
+import static edu.utexas.arlut.ciads.repo.ExceptionHelper.createRefNotFoundException;
 import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Maps;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.jgit.lib.CommitBuilder;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
 public class DataStore {
 
-    private static LoadingCache<RevCommit, DataStore> stores
-            = CacheBuilder.newBuilder()
-                          .maximumSize(1000)
-                          .build(
-                                  new CacheLoader<RevCommit, DataStore>() {
-                                      public DataStore load(RevCommit rev) {
-                                          return new DataStore(rev);
-                                      }
-                                  });
+    private static Cache<String, DataStore> stores = CacheBuilder.newBuilder()
+                                                                 .maximumSize(100)
+                                                                 .build();
     // =================================
-    public static DataStore of(final RevCommit rev) {
-        checkNotNull(rev);
+    // create from baseline repo, or return existing
+    public static DataStore of(final RevCommit baseline, final String name) throws ExceptionHelper.DataStoreCreateAccessException {
+        checkNotNull(baseline);
+        checkNotNull(name);
+
         try {
-            return stores.get(rev);
+            return stores.get(name, new Callable<DataStore>() {
+                @Override
+                public DataStore call() throws IOException {
+                    final GitRepository gr = GitRepository.instance();
+                    Ref branch = gr.getBranch(name);
+                    if (null == branch)
+                        branch = gr.branch(baseline, name);
+
+                    RevCommit commit = gr.getCommit(branch);
+                    return new DataStore(commit, name);
+                }
+            });
         } catch (ExecutionException e) {
-            log.error("Can't instantiate a datastore for rev {}", rev);
-            log.error("", e);
+            throw createDataStoreCreateAccessException(name, e.getCause());
         }
-        return null;
+    }
+    // create detached, or return existing
+    public static DataStore detached(final String name) throws ExceptionHelper.DataStoreCreateAccessException, IOException {
+        checkNotNull(name);
+        DataStore ds = stores.getIfPresent(name);
+        if (null == ds) {
+            final GitRepository gr = GitRepository.instance();
+            RevCommit empty = gr.getCommit("root^{}");
+            return of(empty, name);
+        }
+        return ds;
+    }
+    // return existing
+    public static DataStore existing(final String name) throws RefNotFoundException {
+        checkNotNull(name);
+        DataStore ds = stores.getIfPresent(name);
+        if (null == ds)
+            throw createRefNotFoundException(name);
+        return ds;
     }
 
-    private DataStore(RevCommit rev) {
+    // new DataStore, from baseline, called name
+    //
+    // get DataStore called name
+    //
+    // rename DataStore to newName
+
+    private DataStore(RevCommit rev, final String name) {
         log.info("Datastore startup from {}", rev.abbreviate(10).name());
+        this.name = name;
         revision = rev;
-        index = Index.of(rev.getTree());
         repo = GitRepository.instance();
+    }
+    private void load() {
+        // TODO: load up the index from the persistent store.
+    }
+
+    public void rename(String newName) {
+        // TODO: move ref name
+
+        stores.invalidate(newName);
+        stores.put(newName, this);
+        name = newName;
     }
 
     public void shutdown() {
-        log.info("Shutting down datastore");
+        log.info("Shutting down datastore {}", this);
     }
     public void dump() {
         log.info("dump {}", this);
-        log.info("\tpending");
-        dumpMap("\t{} => {}", added);
-        index.dump();
+        log.info("  = pending =");
+        dumpMap("\t+ {} => {}", added);
+        log.info("\t- {}", deleted);
+        log.info("  = persistent =");
+        dumpMap("\t{} => {}", index);
     }
 
     public static class Transaction implements AutoCloseable {
@@ -82,39 +126,23 @@ public class DataStore {
             ds.rollback();
         }
     }
+    // =================================
     public Transaction beginTX() {
         return new Transaction(this);
     }
-    // =================================
     private void reset() {
         added.clear();
         deleted.clear();
     }
     // commit top-level transaction
     public void commit() {
-        try {
-            for (Integer k : deleted) {
-                index.remove(k);
-            }
-            for (IKeyed<Integer> k : added.values()) {
-                index.add(repo.persist(k), k.key());
-            }
-            ObjectId treeId = index.commit();
-            CommitBuilder commit = new CommitBuilder();
-            commit.setCommitter(GitRepository.systemIdent());
-            commit.setAuthor(GitRepository.systemIdent());
-            commit.setParentIds(revision.getId());
-            commit.setTreeId(treeId);
-            try (CloseableObjectInserter coi = repo.getInserter()) {
-                ObjectId commitId = coi.insert(commit);
-                log.info("Commit: {}", commitId);
-            }
-        } catch (IOException e) {
-            log.info("Error commiting", e);
-            // TODO: how to reset?
+        for (String path: deleted) {
+            index.remove(path);
         }
-
-
+        // TODO: persist to underlying store...
+        for (Map.Entry<String, IKeyed<?>> e: added.entrySet()) {
+        }
+        index.putAll(added);
         reset();
     }
 
@@ -129,104 +157,101 @@ public class DataStore {
             return k.immutable();
         }
     };
-    // merge only (or last remaining) transaction from stack into baseline
-    private void merge(Map<Integer, IKeyed> added, Set<Integer> deleted) {
-        log.info("merge into baseline");
 
-        // make each immutable
-        // put each object in the repo
-        // cache each object in the cache
-        // delete from index
-        // add to index
-        try {
-            for (IKeyed<Integer> k : added.values()) {
-                ObjectId oid = repo.persist(k);
-                index.add(oid, k.key());
-                log.info("Added {} {}", k, oid.abbreviate(10).name());
+    // =================================
+    public <T> T add(IKeyed<?> k) {
+        String key = Integer.toString( nextKey.getAndIncrement() );
+        String path = StringUtil.path(k, key);
+        deleted.remove(path);
+        added.put(path, k);
+        return (T)k.proxyOf(key);
+    }
+    public void remove(Proxy p) {
+        String path = StringUtil.path(p.getClass(), p.getKey());
+        added.remove(path);
+        deleted.add(path);
+    }
+    public void remove(String path) {
+        added.remove(path);
+        deleted.add(path);
+    }
+    // TODO: move to e.g. Tools.java
+
+    private IKeyed<?> _getImpl(String path) {
+        if (deleted.contains(path))
+            return null;
+        if (added.containsKey(path))
+            return added.get(path);
+        return index.get(path);
+    }
+    private IKeyed<?> _getImpl(String key, Class<? extends Proxy> clazz) {
+        final String path = StringUtil.path(clazz, key);
+        return _getImpl(path);
+    }
+
+    public IKeyed<?> getImpl(String key, Class<? extends Proxy> clazz) {
+        return _getImpl(key, clazz);
+    }
+    public IKeyed<?> getImplForMutation(String key, Class<? extends Proxy> clazz) {
+        final String path = StringUtil.path(clazz, key);
+        IKeyed<?> k2 = _getImpl(path);
+        if (null != k2) {
+            k2 = k2.copy();
+            deleted.remove(path);
+            added.put(path, k2);
+            return k2;
+        }
+        return null;
+    }
+    public <T> T get(String key, Class<? extends Proxy> clazz) {
+        IKeyed<?> k2 = _getImpl(key, clazz);
+        return (null == k2) ? null : (T)k2.proxyOf(key);
+    }
+    public <T> T getForMutation(String key, Class<? extends Proxy> clazz) {
+        IKeyed<?> k2 = getImplForMutation(key, clazz);
+        return (null == k2) ? null : (T)k2.proxyOf(key);
+    }
+
+    public Iterable<IKeyed<?>> list() {
+        return index.values();
+    }
+    static Predicate<String> startsWith(final String prefix) {
+        return new Predicate<String>() {
+            @Override
+            public boolean apply(String s) {
+                return s.startsWith(prefix);
             }
-//            index.addAll(added);
-            index.commit();
-        } catch (IOException e) {
-
-        }
+        };
     }
-
-    // =================================
-    public void add(Proxied p) {
-        IKeyed<Integer> impl = p.impl();
-        deleted.remove(impl.key());
-        added.put(impl.key(), impl);
-    }
-    public void add(IKeyed<Integer> val) {
-        deleted.remove(val.key());
-        added.put(val.key(), val);
-    }
-    public void add(Integer key, IKeyed<Integer> val) {
-        deleted.remove(key);
-        added.put(key, val);
-    }
-    public void remove(Integer key) {
-        added.remove(key);
-        deleted.add(key);
-    }
-
-    private String getPath(Integer p) {
-        return p.toString();
-    }
-
-    public <T extends IKeyed> T get(Integer key, Class<?> clazz) {
-        if (deleted.contains(key))
-            return null;
-        if (added.containsKey(key))
-            return (T)added.get(key);
-        String p = getPath(key);
-        ObjectId oid = null;
-        try {
-            oid = index.get(key);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return (T)cache.getIfPresent(oid);
-    }
-    public <T extends IKeyed> T getForMutation(Integer key, Class<?> clazz) {
-        log.info("getForMutation {}", key);
-        IKeyed<Integer> k = get(key, clazz);
-        if (null == k)
-            return null;
-        IKeyed<Integer> k2 = k.copy();
-        add(key, k2);
-        return (T)k2;
-    }
-
-    public Iterable<Keyed> list() {
-        // TODO...
-        return Collections.emptyList();
+    public Iterable<IKeyed<?>> list(IKeyed<?> type) {
+        Map<String, IKeyed<?>> f = Maps.filterKeys(index, startsWith(type.getType()));
+        return f.values();
     }
     // =================================
-
     @Override
     public String toString() {
         return "DataStore from " + revision.abbreviate(10).name();
     }
-
     // =================================
 
+
+    String name;
     GitRepository repo;
-    private static final AtomicInteger objectCounter = new AtomicInteger(0);
+    RevCommit revision;
+    private static final AtomicInteger nextKey = new AtomicInteger(0);
 
     //    private final Map<String, ObjectId> index = newHashMap();
-    Index index;
+//    Index index;
+
+    // path => actual object
+    Map<String, IKeyed<?>> index = newHashMap();
+
     // TODO: parameterize maximumSize
-    private final Cache<ObjectId, Keyed> cache = CacheBuilder.newBuilder()
-                                                             .maximumSize(2000)
-                                                             .build();
-    final RevCommit revision;
-
-    private static final AtomicInteger cnt = new AtomicInteger(0);
-    private final int id = cnt.getAndIncrement();
-
-    private final Map<Integer, IKeyed> added = newHashMap();
-    private final Set<Integer> deleted = newHashSet();
+    private final Cache<ObjectId, IKeyed<?>> cache = CacheBuilder.newBuilder()
+                                                              .maximumSize(2000)
+                                                              .build();
+    private final Map<String, IKeyed<?>> added = newHashMap();
+    private final Set<String> deleted = newHashSet();
 
 
 }

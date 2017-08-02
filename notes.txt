@@ -1,0 +1,32 @@
+Use proxy!!
+
+o have DataStore be per-data-context
+o keep a complete list of path->actual object mappings
+o load all mappings at DataStore creation/re-creation time
+o skip persisting, for now
+o keep added/deleted list, add to (per-context) canonical map at commit-time
+
+o objects should have a programmer-generated 'id' (maps to old __id)
+o objects should have a db-generated 'key'
+o key is used to generate 'path' which is type/key
+o key is per DataStore, unnecessary (for now) to be globally unique.
+o register at start-up mappings of String->class, which is an Impl
+o Impl has a proxy() method which returns the interface class wrapping the impl
+o Pass to DS an un-built 'Builder' which the db sets the key on, then builds, then returns
+o DS can list(<type>) by easily finding all entries <type>/*
+
+
+Test merging into a bare repo
+
+o use impl/mutableImpl
+o make path a first-class type
+
+
+TODO:
+load at start-up
+persist at commit
+make Path a 1st-class type
+list all
+list by type
+decide on Proxy inheritance or annotation
+

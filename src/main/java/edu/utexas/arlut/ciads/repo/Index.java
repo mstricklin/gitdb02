@@ -3,7 +3,10 @@ package edu.utexas.arlut.ciads.repo;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -35,7 +38,7 @@ public class Index {
     // TODO: try DirCache!!!
     Index(RevTree baseline) {
         this.baselineTree = baseline;
-        final GitRepository gr = GitRepository.instance();
+        gr = GitRepository.instance();
         ObjectId treeID = baselineTree.getId();
         try {
             rootTree = new Tree(gr.repo(), treeID);
@@ -45,8 +48,22 @@ public class Index {
         }
     }
 
-    ObjectId commit() {
-        // TODO: return resulting treeID
+    ObjectId commit() throws IOException {
+        // TODO: this is O(n) on the size of the tree in both space and time
+        // a context is about 12201+2756 elements, * 30 bytes = ~500k copied, per commit
+        //  doing an actual windowed tree would be more like O(log n) in both space and time
+
+        // one way to do this would be a single persistent DirCache per index, munge it per commit?
+        // the best way would be to keep&write only the mutated trees
+//        final DirCache inCoreIndex = DirCache.newInCore();
+//        final DirCacheBuilder dcBuilder = inCoreIndex.builder();
+//        final ObjectReader or = gr.newObjectReader();
+//        dcBuilder.addTree(null, 0, or, baselineTree.getId());
+//        dcBuilder.finish();
+//        for (int i = 0; i < inCoreIndex.getEntryCount(); i++) {
+//            log.info("Entry {}", inCoreIndex.getEntry(i));
+//        }
+
         for (Tree.GitTreeEntry e : rootTree) {
             log.info("Tree.GitTreeEntry {}", e);
         }
@@ -66,23 +83,33 @@ public class Index {
         return Integer.toString(p);
     }
 
-    ObjectId get(final Integer id) throws IOException {
-        final GitRepository gr = GitRepository.instance();
-        try {
-            return index.get(id, new Callable<ObjectId>() {
-                @Override
-                public ObjectId call() throws IOException, NoSuchElementException {
-                    TreeWalk tw = TreeWalk.forPath(gr.repo(), getPath(id), baselineTree);
-                    if (!tw.next()) {
-                        throw new NoSuchElementException();
-                    }
-                    return tw.getObjectId(0);
-                }
-            });
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        }
-        return null;
+    ObjectId lookup(final Integer id) throws IOException {
+        log.info("lookup {}", id);
+        return gr.repo().resolve(baselineTree.getId().name() + ':' + getPath(id));
+
+//        TreeWalk tw = TreeWalk.forPath(repo, "0", commitTree);
+//        if (null != tw) {
+//            pathId = tw.getObjectId(0);
+//            log.info("pathId: {}", pathId.name());
+//        }
+//
+//        try {
+//            gr.repo().resolve(baselineTree.getId().name() + ':' + getPath(id));
+//
+//            return index.lookup(id, new Callable<ObjectId>() {
+//                @Override
+//                public ObjectId call() throws IOException, NoSuchElementException {
+//                    TreeWalk tw = TreeWalk.forPath(gr.repo(), getPath(id), baselineTree);
+//                    if (!tw.next()) {
+//                        throw new NoSuchElementException();
+//                    }
+//                    return tw.getObjectId(0);
+//                }
+//            });
+//        } catch (ExecutionException e) {
+//            e.printStackTrace();
+//        }
+//        return null;
     }
 
     Index add(ObjectId oid, final Integer id) {
@@ -119,10 +146,10 @@ public class Index {
     private static final Map<Integer, Index> roots = newHashMap();
     private static final AtomicInteger cnt = new AtomicInteger(0);
 
-    //    private final Map<T, Keyed> index;
+    //    private final Map<T, Proxied> index;
     private final Map<ObjectId, Tree> trees = newHashMap();
 
-//    private final Map<Keyed.Path, ObjectId> index;
+//    private final Map<Proxied.Path, ObjectId> index;
 
     //    private final Map<ObjectId, >
     private final int id = cnt.getAndIncrement();
@@ -135,4 +162,5 @@ public class Index {
                                                  .build();
     //    private final DataStore datastore;
     private final RevTree baselineTree;
+    final GitRepository gr;
 }

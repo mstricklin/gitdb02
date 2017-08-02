@@ -1,3 +1,4 @@
+*.swp
 *.class
 
 # Log file
@@ -31,5 +32,3 @@ t
 # IntelliJ
 .idea
 *.iml
-
-gitdb.git/

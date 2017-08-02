@@ -1,12 +1,11 @@
 package edu.utexas.arlut.ciads;
 
-import edu.utexas.arlut.ciads.repo.DataStore;
-import edu.utexas.arlut.ciads.repo.GitRepository;
-import edu.utexas.arlut.ciads.repo.Keyed;
+import edu.utexas.arlut.ciads.repo.*;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 
@@ -21,53 +20,55 @@ import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
 
 @Slf4j
 public class App {
-/*
-1. Set up baseline
-2. Try DirCache
-3. Non-trivial directory depth
-4. get() and put()
- */
-    static DataStore ds;
-    public static final String BASELINE_TAG = "baseline";
-
-    static Map<String, RevCommit> baselines = newHashMap();
-    private static RevCommit context;
-    public static RevCommit getContext() {
-        return context;
-    }
-
-    public static void main(String[] args) throws GitAPIException, IOException {
+    public static void main(String[] args) throws GitAPIException, IOException, ExceptionHelper.DataStoreCreateAccessException {
         GitRepository gr = GitRepository.init("t.git");
 
-        RevCommit baseline = gr.getCommit(BASELINE_TAG+"^{}");
-        context = baseline;
-        if (null == context) {
+        RevCommit root = gr.getEmpty();
+        RevCommit baseline = gr.getBaseline();
+        if (null == baseline) {
             log.info("Null baseline context");
             System.exit(1);
         }
+
+        RuntimeContext.tlInstance().setDS(baseline, "shazam").setUser("Wile E. Coyote");
+        log.info("RuntimeContext {}", RuntimeContext.tlInstance());
+        DataStore ds = RuntimeContext.tlInstance().getDS();
+
         // TODO: check on baseline existence, and prime if not
         log.info("Baseline {}", baseline.abbreviate(10).name());
-        gr.branch(baseline.getId(), "foo");
 
-
-        ds = DataStore.of(getContext());
+        ds = DataStore.of(baseline, "shazam");
 
         try (DataStore.Transaction tx = ds.beginTX())
         {
-            FrameA af = new FrameA(1, "one0", "one1", "one2");
-            FrameB bf = new FrameB(2, "two0", "two1", "two2");
-            ds.add(af);
-            ds.add(bf);
+            IKeyed k0 = FrameA.builder("shazam0").s0("zero").s1("one").s2("two").build();
+            FrameA fa0 = ds.add(k0);
+            log.info("s0 {}", fa0.getS0());
+//            log.info("s1 {}", fa0.getS1());
+            IKeyed k1 = FrameA.builder("shazam1").s0("zero").s1("one").s2("two").build();
+            FrameA fa1 = ds.add(k1);
+
+            FrameA fa0a = ds.get(fa0.key, FrameA.class);
+            log.info("FrameA fa0 {}", fa0);
+            log.info("FrameA fa1 {}", fa1);
+            log.info("FrameA fa0a {}", fa0a);
             ds.dump();
-//            a();
-            FrameA af0 = FrameA.get(ds, 1);
-            log.info("got FrameA {}", af0);
+
+            fa1.setS0("zeroB");
+
+            ds.remove(fa0a);
+            ds.dump();
             tx.commit();
         }
         ds.dump();
+        FrameA fa1b = ds.get("1", FrameA.class);
+        log.info("s0 {}", fa1b.getS0());
 
 
-        log.info("{}", paths("01/02/03/K.04"));
+//        ds.get()
+
+
+//        log.info("{}", paths("01/02/03/K.04"));
 
 
 

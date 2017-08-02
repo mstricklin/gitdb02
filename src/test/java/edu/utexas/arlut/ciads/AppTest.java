@@ -19,7 +19,7 @@ import org.junit.Test;
 public class AppTest {
     @Test
     public void testCreatedDS() throws GitAPIException {
-        DataStore ds = DataStore.of(null);
+//        DataStore ds = DataStore.of(null, null);
 //        App.MutableK k1 = new App.MutableK(1, "one0", "one1", "one2");
 //        App.MutableK k2 = new App.MutableK(1, "two0", "two1", "two2");
 //
@@ -31,11 +31,11 @@ public class AppTest {
 //        }
         log.info("");
 //        Iterable<Integer> list = ds.list();
-//        for (Keyed k: list) {
+//        for (Proxied k: list) {
 //            log.info("{}", k);
 //        }
 //
-//        List<Keyed> l = newArrayList(list);
+//        List<Proxied> l = newArrayList(list);
 
 //        assertThat(l, contains(k1));
 //        assertThat(l. hasI);
