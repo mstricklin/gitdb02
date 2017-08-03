@@ -2,6 +2,7 @@ package edu.utexas.arlut.ciads.example;
 
 import edu.utexas.arlut.ciads.repo.GitRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.api.RenameBranchCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
@@ -11,6 +12,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -18,6 +20,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.NoSuchElementException;
 
 import static com.google.common.collect.Lists.newArrayList;
 
@@ -29,34 +32,64 @@ public class TryDirCache {
         gr = new GitRepository("t.git");
         Repository repo = gr.repo();
 
-        final DirCache inCoreIndex = DirCache.newInCore();
-        final DirCacheBuilder dcBuilder = inCoreIndex.builder();
-        final ObjectInserter inserter = repo.newObjectInserter();
+        ObjectId pathId = repo.resolve("abc754f719124b8e286e104c1068ba72539e5002:0/1/2");
+        log.info("pathId: {}", pathId.name());
 
-        DirCacheEntry dce = addFile("0", "sam");
-        dcBuilder.add(dce);
-        dce = addFile("1", "sam/i/am");
-        dcBuilder.add(dce);
-        dce = addFile("sam i am 2", "green/eggs/ham");
-        dcBuilder.add(dce);
-        dce = addFile("sam i am 3", "green/eggs/ham3");
-        dcBuilder.add(dce);
-//        log.info("dcBuilder {}", dcBuilder);
-        dcBuilder.finish();
+        ObjectId commitTree = ObjectId.fromString("abc754f719124b8e286e104c1068ba72539e5002");
+        log.info("commitTree: {}", commitTree.name());
+        ObjectId commitId = ObjectId.fromString("f182210f25df259a901422a8279f00fc9566d518");
 
-        for (int i = 0; i < inCoreIndex.getEntryCount(); i++) {
-            log.info("Entry {}", inCoreIndex.getEntry(i));
+        RevWalk rw = new RevWalk(repo);
+        RevCommit rc = rw.parseCommit(commitId);
+        rw.dispose();
+        log.info("RevCommit {}", rc);
+        log.info("RevCommit {}", rc.getTree());
+        log.info("RevCommit {}", rc.getAuthorIdent());
+
+        ObjectReader or = repo.newObjectReader();
+        TreeWalk tw = TreeWalk.forPath(repo, "0", commitTree);
+        if (null != tw) {
+            pathId = tw.getObjectId(0);
+            log.info("pathId: {}", pathId.name());
+        } else
+            log.info("No such");
+
+        TreeWalk tw0 = new TreeWalk(repo);
+        tw0.addTree(commitTree);
+        tw0.setRecursive(true);
+        while (tw0.next()) {
+            log.info("tw0 {}", tw0.getObjectId(0));
         }
-        log.info("");
-        // this allocates a new array
-        for (DirCacheEntry e: inCoreIndex.getEntriesWithin("")) {
-            log.info("Entry {}", e);
-        }
+        tw0.release();
 
-        ObjectId oid = inCoreIndex.writeTree(inserter);
-        inserter.flush();
-        log.info("written tree {}", oid.name());
-
+//        final DirCache inCoreIndex = DirCache.newInCore();
+//        final DirCacheBuilder dcBuilder = inCoreIndex.builder();
+//        final ObjectInserter inserter = repo.newObjectInserter();
+//
+//        DirCacheEntry dce = addFile("0", "sam");
+//        dcBuilder.add(dce);
+//        dce = addFile("1", "sam/i/am");
+//        dcBuilder.add(dce);
+//        dce = addFile("sam i am 2", "green/eggs/ham");
+//        dcBuilder.add(dce);
+//        dce = addFile("sam i am 3", "green/eggs/ham3");
+//        dcBuilder.add(dce);
+////        log.info("dcBuilder {}", dcBuilder);
+//        dcBuilder.finish();
+//
+//        for (int i = 0; i < inCoreIndex.getEntryCount(); i++) {
+//            log.info("Entry {}", inCoreIndex.getEntry(i));
+//        }
+//        log.info("");
+//        // this allocates a new array
+//        for (DirCacheEntry e: inCoreIndex.getEntriesWithin("")) {
+//            log.info("Entry {}", e);
+//        }
+//
+//        ObjectId oid = inCoreIndex.writeTree(inserter);
+//        inserter.flush();
+//        log.info("written tree {}", oid.name());
+//
 
         // =================================
 //        log.info("");
