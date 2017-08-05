@@ -11,16 +11,16 @@ public interface IKeyed<T> {
 
     IKeyed<T> copy();
 
-    T proxyOf(String key);
+    T proxyOf(Integer key);
 
 
 //    @EqualsAndHashCode
 //    @ToString
-//    class Path {
-//        public static Path of(int getKey, String type) {
-//            return new Path(getKey, type);
+//    class TryPath {
+//        public static TryPath of(int getKey, String type) {
+//            return new TryPath(getKey, type);
 //        }
-//        Path(int getKey, String type) {
+//        TryPath(int getKey, String type) {
 //            b0 = (byte) ((getKey & 0xFF000000) >> 24);
 //            b1 = (byte) ((getKey & 0x00FF0000) >> 16);
 //            b2 = (byte) ((getKey & 0x0000FF00) >> 8);

@@ -6,6 +6,5 @@ public interface Proxy {
     IKeyed mutable();
     Class<?> proxiedClass(); // TODO: rm?
     String getType();
-    String getKey();
-    String getPath();
+    Integer getKey();
 }

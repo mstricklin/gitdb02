@@ -1,12 +1,18 @@
 package edu.utexas.arlut.ciads.repo;
 
+import com.google.common.base.Function;
+import edu.utexas.arlut.ciads.repo.util.TreeWalkIterable;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidConfigurationException;
+import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.TreeWalk;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,7 +21,9 @@ import java.util.Map;
 import static com.google.common.collect.Maps.newHashMap;
 import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
 import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+import static edu.utexas.arlut.ciads.repo.StringUtil.path;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
+import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
 
 @Slf4j
 public class GitRepository {
@@ -23,7 +31,13 @@ public class GitRepository {
     public static final String BASELINE_TAG = "baseline";
     public static final String ROOT_TAG = "root";
 
-
+    public static GitRepository init(File f) throws GitAPIException {
+        if ( ! f.isDirectory())
+            throw new InvalidConfigurationException(f.getAbsolutePath() + " is not a dir");
+        if (theRepo == null)
+            theRepo = new GitRepository(f.getAbsolutePath());
+        return theRepo;
+    }
     public static GitRepository init(String location) throws GitAPIException {
         if (theRepo == null)
             theRepo = new GitRepository(location);
@@ -34,15 +48,43 @@ public class GitRepository {
         return theRepo;
     }
 
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + " at " + repo.getDirectory();
+    }
 
-    public GitRepository(final String repoPath) throws GitAPIException {
-        File gitDBDir = new File(repoPath);
+    private GitRepository(final File gitDBDir) throws GitAPIException {
         Git git = Git.init().setBare(true).setDirectory(gitDBDir).call();
         repo = git.getRepository();
         ObjectDatabase db = repo.getObjectDatabase().newCachedDatabase();
         rdb = repo.getRefDatabase();
     }
+    private GitRepository(final String repoPath) throws GitAPIException {
+        this(new File(repoPath));
+    }
 
+    public RevCommit addEmptyCommit() throws IOException {
+        TreeFormatter tf = Tree.emptyTree();
+        ObjectId treeId = persistTree(tf);
+
+        try (CloseableObjectInserter coi = getCloseableInserter()) {
+            CommitBuilder commit = new CommitBuilder();
+            commit.setCommitter(SYSTEM_PERSON_IDENT);
+            commit.setAuthor(SYSTEM_PERSON_IDENT);
+            commit.setTreeId(treeId);
+            ObjectId commitId = coi.insert(commit);
+            log.info("empty commit id {}", commitId.name());
+            return getCommit(commitId);
+        }
+    }
+    public RevCommit getCommitByTag(String tag) throws IOException {
+        return getCommit(tag + "^{}");
+    }
+    public void addTag(String tagName, RevCommit id) {
+        TagBuilder newTag = new TagBuilder();
+        newTag.setTag(tagName);
+        newTag.setObjectId(id);
+    }
     public RevCommit getBaseline() throws IOException {
         return getCommit(BASELINE_TAG + "^{}");
     }
@@ -88,6 +130,10 @@ public class GitRepository {
         return rdb.getRef(refName);
     }
 
+    public ObjectId lookupPath(RevTree tree, String path) throws IOException {
+        return repo.resolve(tree.getId().name() + ':' + path);
+    }
+
     public ObjectId getTagOID(String tagName) throws IOException {
         // TODO: do I need a peeledOID here?
         // 'resolve' is slow...
@@ -100,6 +146,13 @@ public class GitRepository {
 //        return repo.resolve(tagName);
 //        Map<String, Ref> m = repo.getTags();
         return repo.getTags().get(tagName);
+    }
+
+    public <T> Iterable<T> forAllFiles(RevCommit fromCommit, Function<TreeWalk, T> transformer) throws IOException {
+        TreeWalk tw = new TreeWalk(repo);
+        tw.addTree(fromCommit.getTree());
+        tw.setRecursive(true);
+        return new TreeWalkIterable<>(tw, transformer);
     }
 
     public ObjectId commit(ObjectId parentId, ObjectId treeId) throws IOException {
@@ -129,7 +182,7 @@ public class GitRepository {
     }
 
     // TODO: parameterize?
-    private static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("amt.system", "amt.system@arlut.utexas.edu");
+    public static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("amt.system", "amt.system@arlut.utexas.edu");
 
     // =================================
     public ObjectId persist(IKeyed k) throws IOException {
@@ -160,7 +213,7 @@ public class GitRepository {
     }
     public <T> T readObject(ObjectId oid, Class<?> clazz) throws IOException {
         try (CloseableObjectReader cor = tlCOR.get()) {
-            log.info("read object {}:{} from repo", abbreviate(oid), clazz.getSimpleName());
+            log.info("read object {}:{} from gr", abbreviate(oid), clazz.getSimpleName());
             byte[] b = cor.read(oid);
             return (T)serializer.deserialize(b, clazz);
         }

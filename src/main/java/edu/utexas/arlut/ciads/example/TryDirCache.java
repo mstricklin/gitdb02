@@ -29,7 +29,7 @@ public class TryDirCache {
     static GitRepository gr;
 
     public static void main(String[] args) throws GitAPIException, IOException {
-        gr = new GitRepository("t.git");
+        gr = GitRepository.init("t.git");
         Repository repo = gr.repo();
 
         ObjectId pathId = repo.resolve("abc754f719124b8e286e104c1068ba72539e5002:0/1/2");

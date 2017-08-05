@@ -5,9 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -18,10 +17,10 @@ import java.io.IOException;
 public class PartialDirCache {
 
     public static void main(String[] args) throws GitAPIException, IOException {
-        GitRepository gr = new GitRepository("t.git");
+        GitRepository gr = GitRepository.init("t.git");
         Repository repo = gr.repo();
 
-        ObjectId commitId = ObjectId.fromString("0ba10a56034aba6082264241bbbfbb96c8078d89");
+        ObjectId commitId = ObjectId.fromString("9ddf19eff147a109ec74b28269623015e75022bd");
 
         RevWalk rw = new RevWalk(repo);
         RevCommit rc = rw.parseCommit(commitId);
@@ -36,19 +35,41 @@ public class PartialDirCache {
 //        }
 //        tw.release();
 
-        ObjectId dir2aOId = repo.resolve(commitTree.name()+":0/1/2a");
-        log.info("0/1/2a {}", dir2aOId.name());
-        ObjectId dir2cOId = repo.resolve(commitTree.name()+":0/1/2c");
-        log.info("0/1/2c {}", dir2cOId.name());
+        ObjectId dir2aOID = repo.resolve(commitTree.name() + ":0/1/2a");
+        log.info("0/1/2a {}", dir2aOID.name());
+        ObjectId dir2cOID = repo.resolve(commitTree.name() + ":0/1/2c");
+        log.info("0/1/2c {}", dir2cOID.name());
+        ObjectId txt2aOID = repo.resolve(commitTree.name() + ":0/1/2a/2a.txt");
+        log.info("0/1/2a/2a.txt {}", txt2aOID.name());
+        ObjectId txt2cOID = repo.resolve(commitTree.name() + ":0/1/2c/2c.txt");
+        log.info("0/1/2c/2c.txt {}", txt2cOID.name());
 
+        ObjectId txt2cOIDb = gr.persistBlob("2cA".getBytes());
 
+        log.info("");
         final DirCache inCoreIndex = DirCache.newInCore();
-        final DirCacheBuilder dcBuilder = inCoreIndex.builder();
         final ObjectReader or = gr.newObjectReader();
-        dcBuilder.addTree(null, 0, or, dir2aOId);
-        dcBuilder.finish();
+        final ObjectInserter inserter = repo.newObjectInserter();
+
+        final DirCacheBuilder dcBuilder0 = inCoreIndex.builder();
+//        dcBuilder0.add(makeDCE("0/1/2a/2a.txt", txt2aOID));
+        dcBuilder0.add(makeDCE("0/1/2c/2c.txt", txt2cOIDb));
+
+        dcBuilder0.finish();
+
         for (int i = 0; i < inCoreIndex.getEntryCount(); i++) {
             log.info("Entry {}", inCoreIndex.getEntry(i));
         }
+        ObjectId oid = inCoreIndex.writeTree(inserter);
+        inserter.flush();
+        log.info("written changes to tree {}", oid);
+
+    }
+
+    public static DirCacheEntry makeDCE(String path, ObjectId oid) {
+        DirCacheEntry dce = new DirCacheEntry(path);
+        dce.setObjectId(oid);
+        dce.setFileMode(FileMode.REGULAR_FILE);
+        return dce;
     }
 }

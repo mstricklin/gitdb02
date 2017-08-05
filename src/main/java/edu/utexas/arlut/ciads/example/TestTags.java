@@ -20,7 +20,7 @@ public class TestTags {
     static DataStore ds;
 
     public static void main(String[] args) throws GitAPIException, IOException {
-        GitRepository gr = new GitRepository("t.git");
+        GitRepository gr = GitRepository.init("t.git");
 
         Ref baselineTag = gr.getRef("baseline");
         log.info("baselineTag {}", baselineTag);

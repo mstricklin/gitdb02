@@ -35,18 +35,18 @@ public class App {
         DataStore ds = RuntimeContext.tlInstance().getDS();
 
         // TODO: check on baseline existence, and prime if not
-        log.info("Baseline {}", baseline.abbreviate(10).name());
-
-        ds = DataStore.of(baseline, "shazam");
 
         try (DataStore.Transaction tx = ds.beginTX())
         {
-            IKeyed k0 = FrameA.builder("shazam0").s0("zero").s1("one").s2("two").build();
+            IKeyed k0 = FrameA.builder("shazam0").s0("zero0").s1("one0").s2("two0").build();
             FrameA fa0 = ds.add(k0);
             log.info("s0 {}", fa0.getS0());
 //            log.info("s1 {}", fa0.getS1());
-            IKeyed k1 = FrameA.builder("shazam1").s0("zero").s1("one").s2("two").build();
+            IKeyed k1 = FrameA.builder("shazam1").s0("zero1").s1("one1").s2("two1").build();
             FrameA fa1 = ds.add(k1);
+            IKeyed k2 = FrameA.builder("shazam2").s0("zero2").s1("one2").s2("two2").build();
+            FrameA fa2 = ds.add(k2);
+
 
             FrameA fa0a = ds.get(fa0.key, FrameA.class);
             log.info("FrameA fa0 {}", fa0);
@@ -61,7 +61,7 @@ public class App {
             tx.commit();
         }
         ds.dump();
-        FrameA fa1b = ds.get("1", FrameA.class);
+        FrameA fa1b = ds.get(1, FrameA.class);
         log.info("s0 {}", fa1b.getS0());
 
 

@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @TypeValue(value = FrameB.TYPE_VALUE)
 public class FrameB implements Proxy {
-    public final String key;
+    public final Integer key;
     public static final String TYPE_VALUE = "FrameB";
 
     public static Builder builder(String id) {
@@ -40,10 +40,10 @@ public class FrameB implements Proxy {
             return new Impl(id, s0, s1, s2);
         }
     }
-    public static FrameB create(String key) {
+    public static FrameB create(Integer key) {
         return new FrameB(key);
     }
-    private FrameB(String key) {
+    private FrameB(Integer key) {
         this.key = key;
     }
 
@@ -75,12 +75,8 @@ public class FrameB implements Proxy {
         return TYPE_VALUE;
     }
     @Override
-    public String getKey() {
+    public Integer getKey() {
         return key;
-    }
-    @Override
-    public String getPath() {
-        return StringUtil.path(TYPE_VALUE, key);
     }
     @Override
     public Impl impl() {
@@ -96,6 +92,11 @@ public class FrameB implements Proxy {
     @Override
     public Class<Impl> proxiedClass() {
         return Impl.class;
+    }
+
+    @Override
+    public String toString() {
+        return Integer.toString(key) + "=" + impl().toString();
     }
 
     // this is a morally immutable class
@@ -131,7 +132,7 @@ public class FrameB implements Proxy {
         }
 
         @Override
-        public FrameB proxyOf(String key) {
+        public FrameB proxyOf(Integer key) {
             return new FrameB(key);
         }
 

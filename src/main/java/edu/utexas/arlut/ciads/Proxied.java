@@ -24,7 +24,7 @@ public abstract class Proxied<T> implements IKeyed<T> {
     abstract public String getType();
 
     @Override
-    abstract public T proxyOf(String key);
+    abstract public T proxyOf(Integer key);
 
     // named __id for historical reasons
     @JsonProperty("__id")

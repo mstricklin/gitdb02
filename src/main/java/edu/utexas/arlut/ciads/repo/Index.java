@@ -1,24 +1,28 @@
 package edu.utexas.arlut.ciads.repo;
 
+import com.google.common.base.Function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.*;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.treewalk.TreeWalk;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Sets.newHashSet;
+import static com.google.common.collect.Sets.newLinkedHashSetWithExpectedSize;
+import static edu.utexas.arlut.ciads.repo.StringUtil.MAKE_PATHS;
 import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+import static edu.utexas.arlut.ciads.repo.StringUtil.path;
 
 @Slf4j
 public class Index {
@@ -35,20 +39,73 @@ public class Index {
         }
     }
 
-    // TODO: try DirCache!!!
     Index(RevTree baseline) {
-        this.baselineTree = baseline;
-        gr = GitRepository.instance();
-        ObjectId treeID = baselineTree.getId();
+        this.baselineRevTree = baseline;
+        this.gr = GitRepository.instance();
         try {
-            rootTree = new Tree(gr.repo(), treeID);
+            rootTree = new Tree(gr, baselineRevTree.getId());
+            trees.put(null, rootTree);
         } catch (IOException e) {
             // TODO - exception
             e.printStackTrace();
         }
     }
 
+
     ObjectId commit() throws IOException {
+        log.info("Index commit {}", items.keySet());
+
+        Map<String, Tree> parents = newHashMap();
+        for (Map.Entry<String, ObjectId> e: items.entrySet()) {
+//            TryPath p = Paths.get
+        }
+
+//        ImmutableSet<String> paths = FluentIterable.from(items.keySet())
+//                                                   .transformAndConcat(MAKE_PATHS)
+//                                                   .toSet();
+
+//        Map<String, Tree> trees = newHashMap();
+//        for (String p : paths) {
+//            ObjectId pathId = gr.lookupPath(baselineRevTree, p);
+//            trees.put(p, (null == pathId) ? new Tree(gr)
+//                                          : new Tree(gr, pathId));
+//        }
+        log.info("trees:");
+        dumpMap("\t{} =>{}", trees);
+
+        Set<String> s= newLinkedHashSetWithExpectedSize(5);
+        for (Map.Entry<String, ObjectId> e: items.entrySet()) {
+            log.info("get parent for {}", e.getKey());
+        }
+        // do delete
+
+//            log.info("commit {} => {}", e.getKey(), e.getValue());
+//            for (String subPath : StringUtil.paths(e.getKey())) {
+//                if ( ! trees.containsKey(subPath)) {
+//                    final ObjectId pID = gr.lookupPath(baselineRevTree, subPath);
+//
+//                }
+//
+//                final ObjectId pID = gr.lookupPath(baselineRevTree, subPath);
+//                if (null == pID) {
+//                    trees.put(subPath, new Tree(gr));
+//                } else {
+//                    trees.put(subPath, new Tree(gr, pID));
+//
+//                    try {
+//                        trees2.get(subPath, new Callable<Tree>() {
+//                            @Override
+//                            public Tree call() throws Exception {
+//                                return new Tree(gr, pID);
+//                            }
+//                        });
+//                    } catch (ExecutionException ee) {
+//                        ee.printStackTrace();
+//                    }
+//                }
+//                log.info("\t{} {}", subPath, pID);
+//            }
+//        }
         // TODO: this is O(n) on the size of the tree in both space and time
         // a context is about 12201+2756 elements, * 30 bytes = ~500k copied, per commit
         //  doing an actual windowed tree would be more like O(log n) in both space and time
@@ -58,69 +115,43 @@ public class Index {
 //        final DirCache inCoreIndex = DirCache.newInCore();
 //        final DirCacheBuilder dcBuilder = inCoreIndex.builder();
 //        final ObjectReader or = gr.newObjectReader();
-//        dcBuilder.addTree(null, 0, or, baselineTree.getId());
+//        dcBuilder.addTree(null, 0, or, baselineRevTree.getId());
 //        dcBuilder.finish();
 //        for (int i = 0; i < inCoreIndex.getEntryCount(); i++) {
 //            log.info("Entry {}", inCoreIndex.getEntry(i));
 //        }
 
-        for (Tree.GitTreeEntry e : rootTree) {
-            log.info("Tree.GitTreeEntry {}", e);
-        }
-        try {
-            ObjectId treeId = GitRepository.instance().persistTree(rootTree.format());
-            log.info("treeId {}", treeId.name());
-            return treeId;
-        } catch (IOException e) {
-            // TODO - exception
-            log.error("Error formatting tree {}", rootTree);
-            log.error("", e);
-            return null;
-        }
-    }
-
-    private String getPath(Integer p) {
-        return Integer.toString(p);
+//        for (Tree.GitTreeEntry e : rootTree) {
+//            log.info("Tree.GitTreeEntry {}", e);
+//        }
+//        try {
+//            ObjectId treeId = GitRepository.instance().persistTree(rootTree.format());
+//            log.info("treeId {}", treeId.name());
+//            return treeId;
+//        } catch (IOException e) {
+//            // TODO - exception
+//            log.error("Error formatting tree {}", rootTree);
+//            log.error("", e);
+//            return null;
+//        }
+        return null;
     }
 
     ObjectId lookup(final Integer id) throws IOException {
         log.info("lookup {}", id);
-        return gr.repo().resolve(baselineTree.getId().name() + ':' + getPath(id));
-
-//        TreeWalk tw = TreeWalk.forPath(repo, "0", commitTree);
-//        if (null != tw) {
-//            pathId = tw.getObjectId(0);
-//            log.info("pathId: {}", pathId.name());
-//        }
-//
-//        try {
-//            gr.repo().resolve(baselineTree.getId().name() + ':' + getPath(id));
-//
-//            return index.lookup(id, new Callable<ObjectId>() {
-//                @Override
-//                public ObjectId call() throws IOException, NoSuchElementException {
-//                    TreeWalk tw = TreeWalk.forPath(gr.repo(), getPath(id), baselineTree);
-//                    if (!tw.next()) {
-//                        throw new NoSuchElementException();
-//                    }
-//                    return tw.getObjectId(0);
-//                }
-//            });
-//        } catch (ExecutionException e) {
-//            e.printStackTrace();
-//        }
-//        return null;
+        return gr.lookupPath(baselineRevTree, path(id));
     }
 
-    Index add(ObjectId oid, final Integer id) {
-        // TODO: parse out this entry's path, and add resulting Tree to cache
-
-        rootTree.addBlob(getPath(id), oid);
+    Index add(ObjectId id, Integer key) {
+        String path = pathCache.getUnchecked(key);
+        log.info("add to {} {} {} => {}", this, key, path, id);
+        items.put(path, id);
         return this;
     }
 
-    Index remove(final Integer id) {
-        rootTree.remove(getPath(id));
+    Index remove(final Integer key) {
+        String path = pathCache.getUnchecked(key);
+        items.remove(path);
         return this;
     }
 
@@ -137,30 +168,45 @@ public class Index {
         log.info("\t{} dump", this);
         dumpMap("\t{} => {}", index.asMap());
     }
+
     // =================================
-    // immutable need to keep path vs. oid
-    // mutable need to keep path vs. Keyable
-
     Tree rootTree;
-
     private static final Map<Integer, Index> roots = newHashMap();
     private static final AtomicInteger cnt = new AtomicInteger(0);
-
-    //    private final Map<T, Proxied> index;
-    private final Map<ObjectId, Tree> trees = newHashMap();
-
-//    private final Map<Proxied.Path, ObjectId> index;
-
-    //    private final Map<ObjectId, >
     private final int id = cnt.getAndIncrement();
-
-//    private final Tree rootTree;
 
     // TODO: add a watcher for evictions, to check if we're too small
     Cache<Integer, ObjectId> index = CacheBuilder.newBuilder()
                                                  .maximumSize(10000)
                                                  .build();
     //    private final DataStore datastore;
-    private final RevTree baselineTree;
+    private final RevTree baselineRevTree;
     final GitRepository gr;
+
+    final Map<String, ObjectId> items = newHashMap();
+    final Map<String, Tree> trees = newHashMap();
+
+//    Cache<String, Tree> trees2 = CacheBuilder.newBuilder()
+//                                          .maximumSize(200)
+//                                          .build();
+
+    private LoadingCache<String, Tree> trees2
+            = CacheBuilder.newBuilder()
+                          .maximumSize(200)
+                          .build(
+                                  new CacheLoader<String, Tree>() {
+                                      public Tree load(String key) {
+                                          GitRepository gr2 = GitRepository.instance();
+                                          return new Tree(gr2);
+                                      }
+                                  });
+    private static LoadingCache<Integer, String> pathCache
+            = CacheBuilder.newBuilder()
+                          .maximumSize(1000)
+                          .build(
+                                  new CacheLoader<Integer, String>() {
+                                      public String load(Integer key) {
+                                          return path(key);
+                                      }
+                                  });
 }

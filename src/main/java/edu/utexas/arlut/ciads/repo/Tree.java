@@ -4,6 +4,7 @@ package edu.utexas.arlut.ciads.repo;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
+import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,17 +32,21 @@ import org.eclipse.jgit.lib.*;
 
 @Slf4j
 public class Tree implements Iterable<Tree.GitTreeEntry> {
+    public Tree(final GitRepository gr) {
+        this.gr = gr;
+        this.id = ObjectId.zeroId();
+        entries = newHashMap();
+    }
     public Tree(final Tree src) {
-        this.db = src.db;
+        this.gr = src.gr;
         this.id = src.id;
         entries = newHashMap(src.entries);
     }
-    public Tree(final Repository repo, final ObjectId myId) throws IOException {
-        db = repo;
+    public Tree(final GitRepository gr, final ObjectId myId) throws IOException {
+        this.gr = gr;
         id = myId;
         entries = newHashMap();
-        ObjectLoader ldr = db.open(getId(), Constants.OBJ_TREE);
-        readTree(ldr.getCachedBytes());
+        readTree();
     }
     public final ObjectId getId() {
         return id;
@@ -56,13 +61,23 @@ public class Tree implements Iterable<Tree.GitTreeEntry> {
         id = ObjectId.zeroId();
         return e;
     }
+    public GitTreeEntry addTree(@NonNull String name, @NonNull ObjectId id) {
+        GitTreeEntry e = new GitTreeEntry(id, name, FileMode.TREE);
+        entries.put(name, e);
+        id = ObjectId.zeroId();
+        return e;
+    }
     public GitTreeEntry addBlob(@NonNull String name, @NonNull ObjectId id) {
         GitTreeEntry e = new GitTreeEntry(id, name, FileMode.REGULAR_FILE);
         entries.put(name, e);
         id = ObjectId.zeroId();
         return e;
     }
-    public TreeFormatter format() throws IOException {
+    private static final TreeFormatter EMPTY_FORMATTER = new TreeFormatter(0);
+    public static TreeFormatter emptyTree() throws IOException {
+        return EMPTY_FORMATTER;
+    }
+    public ObjectId persist() throws IOException {
         TreeFormatter fmt = new TreeFormatter();
         final List<GitTreeEntry> sortedEntries = newArrayList(entries.values());
         Collections.sort(sortedEntries);
@@ -73,7 +88,11 @@ public class Tree implements Iterable<Tree.GitTreeEntry> {
                 throw new ObjectWritingException(MessageFormat.format(JGitText.get().objectAtPathDoesNotHaveId, e.name));
             fmt.append(e.name, e.fm, id);
         }
-        return fmt;
+        return gr.persistTree(fmt);
+    }
+    @Override
+    public String toString() {
+        return "Tree "+abbreviate(id)+" "+entries.size()+ " items";
     }
     // =================================
     @Override
@@ -83,7 +102,12 @@ public class Tree implements Iterable<Tree.GitTreeEntry> {
     }
     // =================================
 
-    private void readTree(final byte[] raw) throws IOException {
+    private void readTree() throws IOException {
+        ObjectLoader ldr = gr.repo().open(getId(), Constants.OBJ_TREE);
+        readTree(ldr.getCachedBytes());
+    }
+    // stolen from deprecated jgit code
+    private void readTree(final byte[] raw) throws CorruptObjectException {
         final int rawSize = raw.length;
         int rawPtr = 0;
 
@@ -210,6 +234,6 @@ public class Tree implements Iterable<Tree.GitTreeEntry> {
     }
 
     private final Map<String, GitTreeEntry> entries;
-    private final Repository db;
+    private final GitRepository gr;
     private ObjectId id;
 }

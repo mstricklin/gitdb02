@@ -15,16 +15,6 @@ public class JSONSerializer implements Serializer {
         return new JSONSerializer();
     }
 
-    //    @Override
-//    public String serialize(Object o) {
-//        try {
-//            //            return mapper.writeValueAsString(o);
-//            return tlMapper.get().writerWithDefaultPrettyPrinter().writeValueAsString(o);
-//        } catch (JsonProcessingException e) {
-//            log.error("Error serializing Object {} {}", o.getClass().getSimpleName(), e);
-//        }
-//        return "";
-//    }
     private static final byte[] NO_BYTES = {};
 
     @Override
@@ -57,9 +47,11 @@ public class JSONSerializer implements Serializer {
         @Override
         protected ObjectMapper initialValue() {
             ObjectMapper m = new ObjectMapper();
-//            can't resolve jackson-datatypes-collections???
+//            can't resolve jackson-datatypes-collections?
+//            can't make this work, for some reason...
 //                    .registerModule(new GuavaModule());
             m.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+            m.enableDefaultTypingAsProperty(ObjectMapper.DefaultTyping.NON_FINAL, "@class");
             return m;
         }
     };
