@@ -19,5 +19,18 @@ public class App3 {
 //        byte[] b = s.serialize(af0.i);
 
 //        log.info("{}", new String(b));
+
+        String p = "00/00/00/00000017";
+        getKey(p);
+
+    }
+
+    static Integer getKey(String p) {
+        int lI = 1+p.lastIndexOf('/');
+        String subP = p.substring(lI);
+        log.info("{} => {}", p, subP);
+        Integer i = Integer.parseInt(subP, 16);
+        log.info("parsed {}", i);
+        return 7;
     }
 }

@@ -1,28 +1,31 @@
 package edu.utexas.arlut.ciads.repo;
 
-import com.google.common.base.Function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.*;
+import edu.utexas.arlut.ciads.repo.util.XPath;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
-import static com.google.common.collect.Sets.newLinkedHashSetWithExpectedSize;
-import static edu.utexas.arlut.ciads.repo.StringUtil.MAKE_PATHS;
-import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
-import static edu.utexas.arlut.ciads.repo.StringUtil.path;
+import static edu.utexas.arlut.ciads.repo.EntryUtil.toEntry;
+import static edu.utexas.arlut.ciads.repo.StringUtil.*;
 
 @Slf4j
 public class Index {
@@ -51,90 +54,61 @@ public class Index {
         }
     }
 
+    private Map<XPath, Tree> getTrees(Iterable<XPath> paths) throws IOException {
+        // All the parent trees of added and removed items will be modified,
+        // get mutable versions of the Tree's for each parent.
 
+        // all parent paths of added and deleted
+        ImmutableSet<XPath> parentPaths = FluentIterable.from(paths)
+                                                        .transformAndConcat(XPath.MAKE_PATHS)
+                                                        .toSet();
+        log.trace("parent paths {}", parentPaths);
+        Map<XPath, Tree> m = newHashMap();
+        for (XPath p : parentPaths) {
+            final ObjectId id = lookup(p);
+            m.put(p, (null == id) ? new Tree(gr)
+                                  : new Tree(gr, id));
+        }
+
+        return m;
+    }
+
+    // TODO: this is O(n) on the size of the tree in both space and time
+    // a context is about 12201+2756 elements * 30 bytes = ~500k copied, per commit.
+    //  doing an actual windowed tree would be more like O(log n) in both space and time
+
+    // one way to do this would be a single persistent DirCache per Index/DataStore,
+    // then munge it per commit?
+    // the best way would be to keep&write only the mutated trees
     ObjectId commit() throws IOException {
-        log.info("Index commit {}", items.keySet());
+        log.info("Index commit add {}", addItems.keySet());
+        log.info("Index commit rm  {}", rmItems);
 
-        Map<String, Tree> parents = newHashMap();
-        for (Map.Entry<String, ObjectId> e: items.entrySet()) {
-//            TryPath p = Paths.get
+        DirCache inCoreIndex = DirCache.newInCore();
+        DirCacheBuilder dcb = inCoreIndex.builder();
+        final TreeWalk tw = new TreeWalk(gr.newObjectReader());
+        tw.addTree(baselineRevTree.getId());
+        tw.setRecursive(true);
+        while (tw.next()) {
+            XPath xp = new XPath(tw.getPathString());
+            if (rmItems.contains(xp)) {
+                continue;
+            }
+            if (addItems.containsKey(xp))
+                continue;
+            dcb.add(toEntry(tw));
         }
+        for (Map.Entry<XPath, ObjectId> e : addItems.entrySet())
+            dcb.add(toEntry(e.getKey().toString(), e.getValue()));
 
-//        ImmutableSet<String> paths = FluentIterable.from(items.keySet())
-//                                                   .transformAndConcat(MAKE_PATHS)
-//                                                   .toSet();
 
-//        Map<String, Tree> trees = newHashMap();
-//        for (String p : paths) {
-//            ObjectId pathId = gr.lookupPath(baselineRevTree, p);
-//            trees.put(p, (null == pathId) ? new Tree(gr)
-//                                          : new Tree(gr, pathId));
-//        }
-        log.info("trees:");
-        dumpMap("\t{} =>{}", trees);
+        dcb.finish();
+        ObjectInserter oi = gr.newObjectInserter();
+        return gr.persist(inCoreIndex);
+    }
 
-        Set<String> s= newLinkedHashSetWithExpectedSize(5);
-        for (Map.Entry<String, ObjectId> e: items.entrySet()) {
-            log.info("get parent for {}", e.getKey());
-        }
-        // do delete
-
-//            log.info("commit {} => {}", e.getKey(), e.getValue());
-//            for (String subPath : StringUtil.paths(e.getKey())) {
-//                if ( ! trees.containsKey(subPath)) {
-//                    final ObjectId pID = gr.lookupPath(baselineRevTree, subPath);
-//
-//                }
-//
-//                final ObjectId pID = gr.lookupPath(baselineRevTree, subPath);
-//                if (null == pID) {
-//                    trees.put(subPath, new Tree(gr));
-//                } else {
-//                    trees.put(subPath, new Tree(gr, pID));
-//
-//                    try {
-//                        trees2.get(subPath, new Callable<Tree>() {
-//                            @Override
-//                            public Tree call() throws Exception {
-//                                return new Tree(gr, pID);
-//                            }
-//                        });
-//                    } catch (ExecutionException ee) {
-//                        ee.printStackTrace();
-//                    }
-//                }
-//                log.info("\t{} {}", subPath, pID);
-//            }
-//        }
-        // TODO: this is O(n) on the size of the tree in both space and time
-        // a context is about 12201+2756 elements, * 30 bytes = ~500k copied, per commit
-        //  doing an actual windowed tree would be more like O(log n) in both space and time
-
-        // one way to do this would be a single persistent DirCache per index, munge it per commit?
-        // the best way would be to keep&write only the mutated trees
-//        final DirCache inCoreIndex = DirCache.newInCore();
-//        final DirCacheBuilder dcBuilder = inCoreIndex.builder();
-//        final ObjectReader or = gr.newObjectReader();
-//        dcBuilder.addTree(null, 0, or, baselineRevTree.getId());
-//        dcBuilder.finish();
-//        for (int i = 0; i < inCoreIndex.getEntryCount(); i++) {
-//            log.info("Entry {}", inCoreIndex.getEntry(i));
-//        }
-
-//        for (Tree.GitTreeEntry e : rootTree) {
-//            log.info("Tree.GitTreeEntry {}", e);
-//        }
-//        try {
-//            ObjectId treeId = GitRepository.instance().persistTree(rootTree.format());
-//            log.info("treeId {}", treeId.name());
-//            return treeId;
-//        } catch (IOException e) {
-//            // TODO - exception
-//            log.error("Error formatting tree {}", rootTree);
-//            log.error("", e);
-//            return null;
-//        }
-        return null;
+    ObjectId lookup(final XPath p) throws IOException {
+        return gr.lookupPath(baselineRevTree, p);
     }
 
     ObjectId lookup(final Integer id) throws IOException {
@@ -143,15 +117,16 @@ public class Index {
     }
 
     Index add(ObjectId id, Integer key) {
-        String path = pathCache.getUnchecked(key);
-        log.info("add to {} {} {} => {}", this, key, path, id);
-        items.put(path, id);
+        XPath p = pathCache.getUnchecked(key);
+        log.info("add to  {} {} {} => {}", this, key, p, id);
+        addItems.put(p, id);
         return this;
     }
 
     Index remove(final Integer key) {
-        String path = pathCache.getUnchecked(key);
-        items.remove(path);
+        XPath p = pathCache.getUnchecked(key);
+        log.info("rm from {} {} {}", this, key, p);
+        rmItems.add(p);
         return this;
     }
 
@@ -183,7 +158,9 @@ public class Index {
     private final RevTree baselineRevTree;
     final GitRepository gr;
 
-    final Map<String, ObjectId> items = newHashMap();
+    final Map<XPath, ObjectId> addItems = newHashMap();
+    final Set<XPath> rmItems = newHashSet();
+
     final Map<String, Tree> trees = newHashMap();
 
 //    Cache<String, Tree> trees2 = CacheBuilder.newBuilder()
@@ -200,13 +177,26 @@ public class Index {
                                           return new Tree(gr2);
                                       }
                                   });
-    private static LoadingCache<Integer, String> pathCache
+    private static LoadingCache<ObjectId, Tree> trees3
+            = CacheBuilder.newBuilder()
+                          .maximumSize(1000)
+                          .build(new CacheLoader<ObjectId, Tree>() {
+                              public Tree load(ObjectId id) throws IOException {
+                                  return new Tree(GitRepository.instance(), id);
+                              }
+                          });
+    private static LoadingCache<Integer, XPath> pathCache
             = CacheBuilder.newBuilder()
                           .maximumSize(1000)
                           .build(
-                                  new CacheLoader<Integer, String>() {
-                                      public String load(Integer key) {
-                                          return path(key);
+                                  new CacheLoader<Integer, XPath>() {
+                                      public XPath load(Integer key) {
+                                          return new XPath(key);
+//                                          return String.format("%02x/%02x/%02x/%08x",
+//                                                        (byte) ((key & 0xFF000000) >> 24),
+//                                                        (byte) ((key & 0xFF000000) >> 16),
+//                                                        (byte) ((key & 0xFF000000) >> 8),
+//                                                        key);
                                       }
                                   });
 }

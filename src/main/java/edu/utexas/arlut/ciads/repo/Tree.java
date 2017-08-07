@@ -6,10 +6,8 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
@@ -88,11 +86,11 @@ public class Tree implements Iterable<Tree.GitTreeEntry> {
                 throw new ObjectWritingException(MessageFormat.format(JGitText.get().objectAtPathDoesNotHaveId, e.name));
             fmt.append(e.name, e.fm, id);
         }
-        return gr.persistTree(fmt);
+        return gr.persist(fmt);
     }
     @Override
     public String toString() {
-        return "Tree "+abbreviate(id)+" "+entries.size()+ " items";
+        return "Tree "+abbreviate(id)+" "+entries.size()+ " addItems";
     }
     // =================================
     @Override

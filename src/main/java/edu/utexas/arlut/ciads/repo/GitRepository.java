@@ -2,12 +2,13 @@ package edu.utexas.arlut.ciads.repo;
 
 import com.google.common.base.Function;
 import edu.utexas.arlut.ciads.repo.util.TreeWalkIterable;
+import edu.utexas.arlut.ciads.repo.util.XPath;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidConfigurationException;
-import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -19,11 +20,10 @@ import java.io.IOException;
 import java.util.Map;
 
 import static com.google.common.collect.Maps.newHashMap;
+import static edu.utexas.arlut.ciads.repo.EntryUtil.TO_ENTRIES;
 import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
 import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
-import static edu.utexas.arlut.ciads.repo.StringUtil.path;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
 
 @Slf4j
 public class GitRepository {
@@ -65,7 +65,7 @@ public class GitRepository {
 
     public RevCommit addEmptyCommit() throws IOException {
         TreeFormatter tf = Tree.emptyTree();
-        ObjectId treeId = persistTree(tf);
+        ObjectId treeId = persist(tf);
 
         try (CloseableObjectInserter coi = getCloseableInserter()) {
             CommitBuilder commit = new CommitBuilder();
@@ -134,9 +134,13 @@ public class GitRepository {
         return repo.resolve(tree.getId().name() + ':' + path);
     }
 
+    public ObjectId lookupPath(RevTree tree, XPath path) throws IOException {
+        return repo.resolve(tree.getId().name() + ':' + path);
+    }
+
     public ObjectId getTagOID(String tagName) throws IOException {
         // TODO: do I need a peeledOID here?
-        // 'resolve' is slow...
+        // TODO: 'resolve' is slow...
         return repo.resolve(tagName);
 //        Map<String, Ref> m = repo.getTags();
 //        return repo.getTags().get(tagName);
@@ -155,6 +159,13 @@ public class GitRepository {
         return new TreeWalkIterable<>(tw, transformer);
     }
 
+    public Iterable<DirCacheEntry> forAllFiles(RevCommit fromCommit) throws IOException {
+        TreeWalk tw = new TreeWalk(repo);
+        tw.addTree(fromCommit.getTree());
+        tw.setRecursive(true);
+        return new TreeWalkIterable<>(tw, TO_ENTRIES);
+    }
+
     public ObjectId commit(ObjectId parentId, ObjectId treeId) throws IOException {
         try (CloseableObjectInserter coi = getCloseableInserter()) {
             CommitBuilder commit = new CommitBuilder();
@@ -164,6 +175,12 @@ public class GitRepository {
             commit.setTreeId(treeId);
             return coi.insert(commit);
         }
+    }
+
+    public RevCommit commitAndUpdate(String tagName, RevCommit parent, ObjectId newTree) throws IOException {
+        ObjectId commitId = commit(parent.getId(), newTree);
+        updateRef(tagName, commitId);
+        return getCommit(tagName);
     }
 
     public void updateRef(String name, ObjectId newId) throws IOException {
@@ -190,20 +207,27 @@ public class GitRepository {
         return persistBlob(b);
     }
 
-    public ObjectId persistTree(TreeFormatter tf) throws IOException {
+    public ObjectId persist(TreeFormatter tf) throws IOException {
         try (CloseableObjectInserter coi = tlCOI.get()) {
             return coi.insert(tf);
         }
     }
 
     public ObjectId persistBlob(byte[] b) throws IOException {
-        return persistObject(OBJ_BLOB, b);
+        return persist(OBJ_BLOB, b);
     }
 
-    public ObjectId persistObject(int type, byte[] b) throws IOException {
+    public ObjectId persist(int type, byte[] b) throws IOException {
         try (CloseableObjectInserter coi = tlCOI.get()) {
             return coi.insert(type, b);
         }
+    }
+    public ObjectId persist(DirCache dc) throws IOException {
+        ObjectInserter oi = repo.newObjectInserter();
+        ObjectId oid = dc.writeTree(oi);
+        oi.flush();
+        oi.release();
+        return oid;
     }
 
     public byte[] readObject(ObjectId oid) throws IOException {
@@ -213,7 +237,7 @@ public class GitRepository {
     }
     public <T> T readObject(ObjectId oid, Class<?> clazz) throws IOException {
         try (CloseableObjectReader cor = tlCOR.get()) {
-            log.info("read object {}:{} from gr", abbreviate(oid), clazz.getSimpleName());
+//            log.info("read object {}:{} from gr", abbreviate(oid), clazz.getSimpleName());
             byte[] b = cor.read(oid);
             return (T)serializer.deserialize(b, clazz);
         }

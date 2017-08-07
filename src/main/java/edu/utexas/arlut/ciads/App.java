@@ -36,40 +36,41 @@ public class App {
 
         // TODO: check on baseline existence, and prime if not
 
-        try (DataStore.Transaction tx = ds.beginTX())
-        {
-            IKeyed k0 = FrameA.builder("shazam0").s0("zero0").s1("one0").s2("two0").build();
-            FrameA fa0 = ds.add(k0);
-            log.info("s0 {}", fa0.getS0());
-//            log.info("s1 {}", fa0.getS1());
-            IKeyed k1 = FrameA.builder("shazam1").s0("zero1").s1("one1").s2("two1").build();
-            FrameA fa1 = ds.add(k1);
-            IKeyed k2 = FrameA.builder("shazam2").s0("zero2").s1("one2").s2("two2").build();
-            FrameA fa2 = ds.add(k2);
+        FrameA fa9 = ds.get(9, FrameA.class);
+        log.info("9: {}", fa9);
+
+        try (DataStore.Transaction tx = ds.beginTX()) {
+            for (int i = 0; i < 10; i++) {
+                IKeyed k = FrameA.builder("shazam" + i)
+                                 .s0("zero" + i)
+                                 .s1("one" + i)
+                                 .s2("two" + i)
+                                 .build();
+                ds.add(k);
+            }
 
 
-            FrameA fa0a = ds.get(fa0.key, FrameA.class);
+            FrameA fa0 = ds.get(0, FrameA.class);
             log.info("FrameA fa0 {}", fa0);
+            FrameA fa1 = ds.get(1, FrameA.class);
             log.info("FrameA fa1 {}", fa1);
-            log.info("FrameA fa0a {}", fa0a);
             ds.dump();
 
-            fa1.setS0("zeroB");
+            fa0.setS0("zeroB");
+            ds.remove(fa1);
 
-            ds.remove(fa0a);
             ds.dump();
             tx.commit();
         }
         ds.dump();
-        FrameA fa1b = ds.get(1, FrameA.class);
-        log.info("s0 {}", fa1b.getS0());
+        FrameA fa2b = ds.get(2, FrameA.class);
+        log.info("s0 {}", fa2b.getS0());
 
 
 //        ds.get()
 
 
 //        log.info("{}", paths("01/02/03/K.04"));
-
 
 
 //        ObjectId treeId = ObjectId.fromString("434943a8265129a744745e5d12fa2625a784b283");
@@ -138,18 +139,20 @@ public class App {
 
         ds.shutdown();
     }
+
     // =================================
     static List<String> paths(final String path) {
         String p = path;
         List<String> l = newArrayList();
 
-        for (int i=p.lastIndexOf('/'); i!= -1; i=p.lastIndexOf('/')) {
+        for (int i = p.lastIndexOf('/'); i != -1; i = p.lastIndexOf('/')) {
             p = p.substring(0, i);
             l.add(p);
             log.info("index {} {}", i, p);
         }
         return l;
     }
+
     // =================================
     static void a() {
 //        try (DataStore.Transaction tx = ds.beginTX()) {

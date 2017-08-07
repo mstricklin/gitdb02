@@ -8,6 +8,7 @@ import static edu.utexas.arlut.ciads.repo.ExceptionHelper.createDataStoreCreateA
 import static edu.utexas.arlut.ciads.repo.ExceptionHelper.createRefNotFoundException;
 import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
 import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+import static edu.utexas.arlut.ciads.repo.util.XPath.extractKeyFromPath;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -24,6 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.*;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -83,27 +85,19 @@ public class DataStore {
     //
     // rename DataStore to newName
 
-    private DataStore(RevCommit revision, final String name) {
+    private DataStore(RevCommit revision, final String name) throws IOException {
         this.revision = revision;
         this.name = name;
         gr = GitRepository.instance();
         index = new Index(revision.getTree());
-        try {
-            for (String s: gr.forAllFiles(revision, f))
-                log.info("add file {}", s);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        log.info("DataStore startup {}", toString());
+        initialLoad();
     }
-    private Function<TreeWalk, String> f = new Function<TreeWalk, String>() {
-        @Override
-        public String apply(TreeWalk tw) {
-            return tw.getPathString();
+    private void initialLoad() throws IOException {
+        for (DirCacheEntry dce: gr.forAllFiles(revision)) {
+            Integer key = extractKeyFromPath(dce.getPathString());
+            IKeyed k = gr.readObject(dce.getObjectId(), IKeyed.class);
+            store.put(extractKeyFromPath(dce.getPathString()), k);
         }
-    };
-    private void load() {
-        // TODO: load up the store from the persistent store.
     }
 
     public void rename(String newName) {
@@ -115,7 +109,7 @@ public class DataStore {
     }
 
     public void shutdown() {
-        log.info("Shutting down datastore {}", this);
+        log.info("Shutting down {}", this);
     }
     public void dump() {
         log.info("dump {}", this);
@@ -153,30 +147,26 @@ public class DataStore {
     // commit top-level transaction
     public void commit() throws IOException {
         for (Integer key: deleted) {
+            index.remove(key);
             store.remove(key);
         }
         for (Map.Entry<Integer, IKeyed<?>> e: added.entrySet()) {
             ObjectId id = gr.persist(e.getValue());
             index.add(id, e.getKey());
-//            store.add(e.getKey(),e.getValue());
         }
         store.putAll(added);
         reset();
-        index.commit();
+
+        ObjectId commitTreeId = index.commit();
+        RevCommit oldCommit = revision;
+        revision = gr.commitAndUpdate(name, revision, commitTreeId);
+        log.info("roll {} from {} to {}", name, abbreviate(oldCommit), abbreviate(revision));
     }
 
     // rollback top-level transaction
     public void rollback() {
         reset();
     }
-
-    private Function<Keyed, Keyed> MAKE_IMMUTABLE = new Function<Keyed, Keyed>() {
-        @Override
-        public Keyed apply(Keyed k) {
-            return k.immutable();
-        }
-    };
-
     // =================================
     public <T> T add(IKeyed<?> k) {
         Integer key = nextKey.getAndIncrement();
@@ -222,24 +212,11 @@ public class DataStore {
         IKeyed<?> k2 = getImplForMutation(key, clazz);
         return (null == k2) ? null : (T)k2.proxyOf(key);
     }
-
+    public Iterable<? extends IKeyed> list() {
+        return store.values();
+    }
     public Iterable<? extends IKeyed> list(Class<? extends IKeyed> clazz) {
         return Iterables.filter(store.values(), clazz);
-    }
-    static Predicate<String> startsWith(final String prefix) {
-        return new Predicate<String>() {
-            @Override
-            public boolean apply(String s) {
-                return s.startsWith(prefix);
-            }
-        };
-    }
-    public Iterable<IKeyed<?>> list(String type) {
-        IKeyed k = Iterables.getFirst(store.values(), null);
-        k.getType();
-//        Map<String, IKeyed<?>> f = Maps.filterKeys(store, startsWith(type.getType()));
-//        return f.values();
-        return Collections.emptyList();
     }
     // =================================
     @Override
@@ -259,10 +236,7 @@ public class DataStore {
     // path => actual object
     Map<Integer, IKeyed<?>> store = newHashMap();
 
-    // TODO: parameterize maximumSize
-//    private final Cache<ObjectId, IKeyed<?>> cache = CacheBuilder.newBuilder()
-//                                                              .maximumSize(2000)
-//                                                              .build();
+    // transaction workspace
     private final Map<Integer, IKeyed<?>> added = newHashMap();
     private final Set<Integer> deleted = newHashSet();
 

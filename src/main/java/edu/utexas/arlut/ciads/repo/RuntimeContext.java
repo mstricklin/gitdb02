@@ -15,32 +15,40 @@ public class RuntimeContext {
         return tlRuntimeContext.get();
     }
 
-    public DataStore getDS() {
-        return ds;
+    public static DataStore getDS() {
+        return get().ds;
     }
-    public RuntimeContext setDS(final RevCommit baseline, final String name) {
+
+    public static RuntimeContext setDS(final RevCommit baseline, final String name) {
         try {
-            ds = DataStore.of(baseline, name);
+            get().ds = DataStore.of(baseline, name);
         } catch (ExceptionHelper.DataStoreCreateAccessException e) {
             e.printStackTrace();
             log.info("Error creating dataStore {} in context {}", name, abbreviate(baseline));
         }
-        return this;
+        return get();
     }
-    public RuntimeContext setDS(DataStore ds) {
-        this.ds = ds;
-        return this;
+
+    public static RuntimeContext setDS(DataStore ds) {
+        get().ds = ds;
+        return get();
     }
-    public String getUser() {
-        return user;
+
+    public static String getUser() {
+        return get().user;
     }
-    public RuntimeContext setUser(String username) {
-        user = username;
-        return this;
+
+    public static RuntimeContext setUser(String username) {
+        get().user = username;
+        return get();
     }
 
     // =================================
     private RuntimeContext() {
+    }
+
+    private static RuntimeContext get() {
+        return tlRuntimeContext.get();
     }
 
     private DataStore ds;
