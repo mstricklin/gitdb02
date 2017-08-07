@@ -52,7 +52,7 @@ public class PartialDirCache {
         final ObjectInserter inserter = repo.newObjectInserter();
 
         final DirCacheBuilder dcBuilder0 = inCoreIndex.builder();
-//        dcBuilder0.add(makeDCE("0/1/2a/2a.txt", txt2aOID));
+//        dcBuilder0.persist(makeDCE("0/1/2a/2a.txt", txt2aOID));
         dcBuilder0.add(makeDCE("0/1/2c/2c.txt", txt2cOIDb));
 
         dcBuilder0.finish();

@@ -4,7 +4,7 @@ package edu.utexas.arlut.ciads.repo;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
-import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
+import static edu.utexas.arlut.ciads.repo.util.Strings.abbreviate;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

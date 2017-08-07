@@ -1,22 +1,16 @@
 package edu.utexas.arlut.ciads;
 
 import edu.utexas.arlut.ciads.repo.*;
-import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
-import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+import static edu.utexas.arlut.ciads.repo.util.Strings.dumpMap;
 
 @Slf4j
 public class App {
@@ -30,34 +24,31 @@ public class App {
             System.exit(1);
         }
 
-        RuntimeContext.tlInstance().setDS(baseline, "shazam").setUser("Wile E. Coyote");
-        log.info("RuntimeContext {}", RuntimeContext.tlInstance());
-        DataStore ds = RuntimeContext.tlInstance().getDS();
+        RuntimeContext.setDS(baseline, "shazam").setUser("Wile E. Coyote");
+        log.info("RuntimeContext {}", RuntimeContext.str());
+        DataStore ds = RuntimeContext.getDS();
 
         // TODO: check on baseline existence, and prime if not
 
-        FrameA fa9 = ds.get(9, FrameA.class);
-        log.info("9: {}", fa9);
-
         try (DataStore.Transaction tx = ds.beginTX()) {
-            for (int i = 0; i < 10; i++) {
-                IKeyed k = FrameA.builder("shazam" + i)
-                                 .s0("zero" + i)
-                                 .s1("one" + i)
-                                 .s2("two" + i)
-                                 .build();
-                ds.add(k);
+            for (int i = 0; i < 3; i++) {
+                Keyed k = FrameA.builder("shazam" + i)
+                                .s0("zero" + i)
+                                .s1("one" + i)
+                                .s2("two" + i)
+                                .build();
+                ds.persist(k);
             }
 
 
-            FrameA fa0 = ds.get(0, FrameA.class);
-            log.info("FrameA fa0 {}", fa0);
-            FrameA fa1 = ds.get(1, FrameA.class);
-            log.info("FrameA fa1 {}", fa1);
+            FrameA fa4 = ds.get(4, FrameA.class);
+            log.info("FrameA fa4 {}", fa4);
+            FrameA fa5 = ds.get(5, FrameA.class);
+            log.info("FrameA fa1 {}", fa5);
             ds.dump();
 
-            fa0.setS0("zeroB");
-            ds.remove(fa1);
+            fa4.setS0("zeroB");
+            ds.remove(fa5);
 
             ds.dump();
             tx.commit();
@@ -65,8 +56,25 @@ public class App {
         ds.dump();
         FrameA fa2b = ds.get(2, FrameA.class);
         log.info("s0 {}", fa2b.getS0());
+        log.info("\n");
 
+        RuntimeContext.setDS(baseline, "shazam2").setUser("Wile E. Coyote");
+        log.info("RuntimeContext {}", RuntimeContext.str());
+        ds = RuntimeContext.getDS();
 
+        try (DataStore.Transaction tx = ds.beginTX()) {
+            for (int i = 0; i < 3; i++) {
+                Keyed k = FrameA.builder("shazam" + i)
+                                .s0("zero" + i)
+                                .s1("one" + i)
+                                .s2("two" + i)
+                                .build();
+                ds.persist(k);
+            }
+            ds.dump();
+            tx.commit();
+        }
+        ds.dump();
 //        ds.get()
 
 
@@ -82,9 +90,9 @@ public class App {
 //
 //        {
 //            MutableK k1 = new MutableK(5, "five0", "five1", "five2");
-//            tx.add(5, k1);
+//            tx.persist(5, k1);
 //            MutableK k2 = new MutableK(6, "six0", "six1", "six2");
-//            tx.add(6, k2);
+//            tx.persist(6, k2);
 //            tx.remove(3);
 //            tx.dump();
 //            ds.dump();
@@ -94,8 +102,8 @@ public class App {
 
 //        try (Transaction tx0 = ds.beginTX()) {
 //            MutableK k1 = new MutableK(1, "one0", "one1", "one2");
-//            tx0.add(1L, k1);
-//            tx0.add(2L, new MutableK(2, "two0", "two1", "two2"));
+//            tx0.persist(1L, k1);
+//            tx0.persist(2L, new MutableK(2, "two0", "two1", "two2"));
 //            log.info("DS 2L {}", ds.get(2L));
 //            log.info("TX0 2L {}", tx0.get(2L));
 //
@@ -154,94 +162,5 @@ public class App {
     }
 
     // =================================
-    static void a() {
-//        try (DataStore.Transaction tx = ds.beginTX()) {
-//            ds.add(3, new MutableK(3, "three0", "three1", "three2"));
-//            ds.add(4, new MutableK(4, "four0", "four1", "four2"));
-//            ds.dump();
-//            tx.commit();
-//        }
-    }
 
-    abstract static class K extends Keyed {
-        static String getPath(Integer key) {
-            return "K/" + key;
-        }
-
-        protected K(Integer key) {
-            super(key);
-        }
-
-        @Override
-        public String getType() {
-            return "K";
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            log.info("equals {}.equals({})", this, other);
-            if (other == this)
-                return true;
-            if (null == other)
-                return false;
-            if (!other.getClass().equals(getClass()))
-                return false;
-            return key == ((K) other).key;
-        }
-    }
-
-    @ToString
-    public static class ImmutableK extends K {
-        ImmutableK(MutableK mk) {
-            super(mk.key);
-            this.s0 = mk.s0;
-            this.s1 = mk.s1;
-            this.s2 = mk.s2;
-        }
-
-        public Keyed immutable() {
-            return this;
-        }
-
-        public Keyed mutable() {
-            return new MutableK(this);
-        }
-
-        final String s0;
-        final String s1;
-        final String s2;
-    }
-
-    @ToString
-    public static class MutableK extends K {
-        MutableK(int id, String s0, String s1, String s2) {
-            super(id);
-            this.s0 = s0;
-            this.s1 = s1;
-            this.s2 = s2;
-        }
-
-        MutableK(ImmutableK ik) {
-            super(ik.key);
-            this.s0 = ik.s0;
-            this.s1 = ik.s1;
-            this.s2 = ik.s2;
-        }
-
-        @Override
-        public Keyed immutable() {
-            return new ImmutableK(this);
-        }
-
-        @Override
-        public Keyed mutable() {
-            return this;
-        }
-
-        String s0;
-        String s1;
-        String s2;
-    }
-
-    private static final long serialVersionUID = 1L;
 }

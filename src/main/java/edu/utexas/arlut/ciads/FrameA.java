@@ -7,17 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 
 // =================================
 @Slf4j
-@TypeValue(value = FrameA.TYPE_VALUE)
 public class FrameA implements Proxy {
 
     public final Integer key;
     public static final String TYPE_VALUE = "FrameA";
 
-    // create *
-    // read *
-    // readForUpdate *
-    // delete *
-    // list
     public static Builder builder(String id) {
         return new Builder(id);
     }
@@ -88,12 +82,12 @@ public class FrameA implements Proxy {
 
     @Override
     public Impl impl() {
-        DataStore ds = RuntimeContext.tlInstance().getDS();
+        DataStore ds = RuntimeContext.getDS();
         return (Impl)ds.getImpl(key, FrameA.class);
     }
     @Override
     public Impl mutable() {
-        DataStore ds = RuntimeContext.tlInstance().getDS();
+        DataStore ds = RuntimeContext.getDS();
         return (Impl)ds.getImplForMutation(key, FrameA.class);
     }
 
@@ -110,7 +104,6 @@ public class FrameA implements Proxy {
     // this is a morally immutable class
     @ToString
     public static class Impl extends Proxied<FrameA> {
-        private String id;
         private String s0;
         private String s1;
         private String s2;
@@ -123,7 +116,6 @@ public class FrameA implements Proxy {
 
         Impl(String id, String s0, String s1, String s2) {
             super(id);
-            this.id = id;
             this.s0 = s0;
             this.s1 = s1;
             this.s2 = s2;

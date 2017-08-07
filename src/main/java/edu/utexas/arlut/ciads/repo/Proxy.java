@@ -2,8 +2,8 @@
 package edu.utexas.arlut.ciads.repo;
 
 public interface Proxy {
-    IKeyed impl();
-    IKeyed mutable();
+    Keyed impl();
+    Keyed mutable();
     Class<?> proxiedClass(); // TODO: rm?
     String getType();
     Integer getKey();

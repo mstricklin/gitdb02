@@ -1,7 +1,10 @@
-package edu.utexas.arlut.ciads.repo;
+package edu.utexas.arlut.ciads;
 
-import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
+import static edu.utexas.arlut.ciads.repo.util.Strings.abbreviate;
 
+import edu.utexas.arlut.ciads.repo.DataStore;
+import edu.utexas.arlut.ciads.repo.DataStoreBuilder;
+import edu.utexas.arlut.ciads.repo.ExceptionHelper;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -11,17 +14,13 @@ import org.eclipse.jgit.revwalk.RevCommit;
 public class RuntimeContext {
     // TODO: look this up by user?
 
-    public static RuntimeContext tlInstance() {
-        return tlRuntimeContext.get();
-    }
-
     public static DataStore getDS() {
         return get().ds;
     }
 
     public static RuntimeContext setDS(final RevCommit baseline, final String name) {
         try {
-            get().ds = DataStore.of(baseline, name);
+            get().ds = DataStoreBuilder.of(baseline, name);
         } catch (ExceptionHelper.DataStoreCreateAccessException e) {
             e.printStackTrace();
             log.info("Error creating dataStore {} in context {}", name, abbreviate(baseline));
@@ -41,6 +40,9 @@ public class RuntimeContext {
     public static RuntimeContext setUser(String username) {
         get().user = username;
         return get();
+    }
+    public static String str() {
+        return get().toString();
     }
 
     // =================================

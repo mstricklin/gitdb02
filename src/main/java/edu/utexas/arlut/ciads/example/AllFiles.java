@@ -9,8 +9,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import edu.utexas.arlut.ciads.FrameA;
 import edu.utexas.arlut.ciads.repo.GitRepository;
-import edu.utexas.arlut.ciads.repo.IKeyed;
-import edu.utexas.arlut.ciads.repo.TypeRegistry;
+import edu.utexas.arlut.ciads.repo.Keyed;
 import edu.utexas.arlut.ciads.repo.util.TreeWalkIterable;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -23,11 +22,8 @@ public class AllFiles {
     public static void main(String[] args) throws GitAPIException, IOException {
 
         GitRepository gr = GitRepository.init("t.git");
-        Repository repo = gr.repo();
         RevCommit baseline = gr.getBaseline();
         ObjectDatabase odb = gr.repo().getObjectDatabase();
-
-        TypeRegistry.register(FrameA.TYPE_VALUE, FrameA.Impl.class);
 
         log.info("baseline {}", baseline.getId());
         log.info("baseline tree {}", baseline.getTree().name());
@@ -52,13 +48,13 @@ public class AllFiles {
             ObjectId oid = tw0.getObjectId(0);
             String path = tw0.getPathString();
             String type = Iterables.getFirst(PATH_SPLITTER.split(path), null);
-            Class<? extends IKeyed> typeClazz = TypeRegistry.get(type);
+            Class<? extends Keyed> typeClazz = null;
 
             if (null == typeClazz) {
                 log.info("No known type found in {}", path);
             } else {
                 log.info("type found {}", typeClazz);
-                IKeyed k = gr.readObject(oid, typeClazz);
+                Keyed k = gr.readObject(oid, typeClazz);
                 log.info("type loaded {}", k);
             }
         }

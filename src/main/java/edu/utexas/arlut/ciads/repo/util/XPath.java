@@ -2,6 +2,9 @@ package edu.utexas.arlut.ciads.repo.util;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -20,6 +23,9 @@ public class XPath {
         return Integer.parseInt(subP, 16);
     }
 
+    public static XPath of(int key) {
+        return pathCache.getUnchecked(key);
+    }
     public XPath(int key) {
         path = String.format("%02x/%02x/%02x/%08x",
                              (byte) ((key & 0xFF000000) >> 24),
@@ -81,4 +87,14 @@ public class XPath {
     };
 
     public final String path;
+    // =================================
+    private static LoadingCache<Integer, XPath> pathCache
+            = CacheBuilder.newBuilder()
+                          .maximumSize(1000)
+                          .build(
+                                  new CacheLoader<Integer, XPath>() {
+                                      public XPath load(Integer key) {
+                                          return new XPath(key);
+                                      }
+                                  });
 }

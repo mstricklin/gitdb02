@@ -6,9 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 
 // =================================
-@ToString
 @Slf4j
-@TypeValue(value = FrameB.TYPE_VALUE)
 public class FrameB implements Proxy {
     public final Integer key;
     public static final String TYPE_VALUE = "FrameB";
@@ -80,12 +78,12 @@ public class FrameB implements Proxy {
     }
     @Override
     public Impl impl() {
-        DataStore ds = RuntimeContext.tlInstance().getDS();
+        DataStore ds = RuntimeContext.getDS();
         return (Impl)ds.getImpl(key, FrameB.class);
     }
     @Override
     public Impl mutable() {
-        DataStore ds = RuntimeContext.tlInstance().getDS();
+        DataStore ds = RuntimeContext.getDS();
         return (Impl)ds.getImplForMutation(key, FrameB.class);
     }
     // =================================

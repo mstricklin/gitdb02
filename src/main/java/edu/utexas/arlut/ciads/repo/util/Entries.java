@@ -1,4 +1,4 @@
-package edu.utexas.arlut.ciads.repo;
+package edu.utexas.arlut.ciads.repo.util;
 
 import com.google.common.base.Function;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -7,8 +7,8 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
-public class EntryUtil {
-    static DirCacheEntry toEntry(final TreeWalk tw) {
+public class Entries {
+    public static DirCacheEntry toEntry(final TreeWalk tw) {
         final DirCacheEntry e = new DirCacheEntry(tw.getRawPath());
         final AbstractTreeIterator i;
 
@@ -18,7 +18,7 @@ public class EntryUtil {
         return e;
     }
 
-    static DirCacheEntry toEntry(final String path, final ObjectId id) {
+    public static DirCacheEntry toEntry(final String path, final ObjectId id) {
         final DirCacheEntry e = new DirCacheEntry(path);
         e.setFileMode(FileMode.REGULAR_FILE);
         e.setObjectId(id);
@@ -26,7 +26,7 @@ public class EntryUtil {
         return e;
     }
 
-    static Function<TreeWalk, DirCacheEntry> TO_ENTRIES = new Function<TreeWalk, DirCacheEntry>() {
+    public static Function<TreeWalk, DirCacheEntry> TO_ENTRIES = new Function<TreeWalk, DirCacheEntry>() {
         @Override
         public DirCacheEntry apply(TreeWalk tw) {
             return toEntry(tw);

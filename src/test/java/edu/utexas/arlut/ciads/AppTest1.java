@@ -45,7 +45,7 @@ public class AppTest1 {
     @Test
     public void testBasicAdd() throws IOException, ExceptionHelper.DataStoreCreateAccessException {
         assertTrue(true);
-        DataStore ds = DataStore.of(emptyCommit, "Test");
+        DataStore ds = DataStoreBuilder.of(emptyCommit, "Test");
 
     }
 }

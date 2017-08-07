@@ -20,9 +20,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import static com.google.common.collect.Maps.newHashMap;
-import static edu.utexas.arlut.ciads.repo.EntryUtil.TO_ENTRIES;
-import static edu.utexas.arlut.ciads.repo.StringUtil.abbreviate;
-import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+import static edu.utexas.arlut.ciads.repo.util.Entries.TO_ENTRIES;
+import static edu.utexas.arlut.ciads.repo.util.Strings.dumpMap;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
 @Slf4j
@@ -202,7 +201,7 @@ public class GitRepository {
     public static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("amt.system", "amt.system@arlut.utexas.edu");
 
     // =================================
-    public ObjectId persist(IKeyed k) throws IOException {
+    public ObjectId persist(Keyed k) throws IOException {
         byte[] b = serializer.serialize(k);
         return persistBlob(b);
     }

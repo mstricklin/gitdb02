@@ -67,13 +67,13 @@ public class TryDirCache {
 //        final ObjectInserter inserter = repo.newObjectInserter();
 //
 //        DirCacheEntry dce = addFile("0", "sam");
-//        dcBuilder.add(dce);
+//        dcBuilder.persist(dce);
 //        dce = addFile("1", "sam/i/am");
-//        dcBuilder.add(dce);
+//        dcBuilder.persist(dce);
 //        dce = addFile("sam i am 2", "green/eggs/ham");
-//        dcBuilder.add(dce);
+//        dcBuilder.persist(dce);
 //        dce = addFile("sam i am 3", "green/eggs/ham3");
-//        dcBuilder.add(dce);
+//        dcBuilder.persist(dce);
 ////        log.info("dcBuilder {}", dcBuilder);
 //        dcBuilder.finish();
 //

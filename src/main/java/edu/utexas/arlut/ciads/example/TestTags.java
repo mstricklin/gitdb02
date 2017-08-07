@@ -1,7 +1,7 @@
 package edu.utexas.arlut.ciads.example;
 
-import edu.utexas.arlut.ciads.repo.DataStore;
 import edu.utexas.arlut.ciads.repo.GitRepository;
+import edu.utexas.arlut.ciads.repo.DataStore;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Ref;
@@ -13,7 +13,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import java.io.IOException;
 import java.util.Map;
 
-import static edu.utexas.arlut.ciads.repo.StringUtil.dumpMap;
+import static edu.utexas.arlut.ciads.repo.util.Strings.dumpMap;
 
 @Slf4j
 public class TestTags {
