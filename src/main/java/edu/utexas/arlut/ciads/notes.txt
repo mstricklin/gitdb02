@@ -1,7 +1,0 @@
-
-o abstract out RevCommit
-o abstract out GitRepo initialization
-o make GitRepo package-private
-o check GitRepo initialization before use
-o test multiple commits
-o test multiple branches

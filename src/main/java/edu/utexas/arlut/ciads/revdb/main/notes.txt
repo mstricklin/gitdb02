@@ -1,0 +1,17 @@
+
+X make GitRepo package-private
+X check raw uses of repo()
+X check GitRepo initialization before use
+X make impl and public iface directories
+
+
+
+o pass repo to DataStore creator/ remove singleton of repo
+o abstract out RevCommit
+o abstract out GitRepo initialization
+o test multiple commits
+o test multiple branches
+o auto-install sources
+o pull out jsch?
+
+o Use code injection, instead of impl/pimpl and poor-mans' observer

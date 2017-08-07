@@ -5,7 +5,7 @@ cd t
 
 git init
 git commit --allow-empty -m empty
-git tag root
+git tag ROOT
 
 mkdir -p 00/00/00
 #echo 1 > 01/02/03/K.1020301
@@ -26,7 +26,7 @@ export A=$(cat <<EOF
 }
 EOF
 )
-Echo -n "$A" > 00/00/00/00000001
+echo -n "$A" > 00/00/00/00000001
 
 export A=$(cat <<EOF
 {
