@@ -90,7 +90,7 @@ public class Tree implements Iterable<Tree.GitTreeEntry> {
     }
     @Override
     public String toString() {
-        return "Tree "+abbreviate(id)+" "+entries.size()+ " addItems";
+        return "Tree "+abbreviate(id)+" "+entries.size()+ " changedItems";
     }
     // =================================
     @Override

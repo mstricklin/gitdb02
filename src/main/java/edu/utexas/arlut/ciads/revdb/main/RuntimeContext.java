@@ -1,24 +1,21 @@
 package edu.utexas.arlut.ciads.revdb.main;
 
-import static edu.utexas.arlut.ciads.revdb.util.Strings.abbreviate;
-
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import edu.utexas.arlut.ciads.revdb.DataStoreBuilder;
 import edu.utexas.arlut.ciads.revdb.util.ExceptionHelper;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
 @ToString
 public class RuntimeContext {
     // TODO: look this up by user?
 
-    public static DataStore getDS() {
+    public static DataView getDS() {
         return get().ds;
     }
 
-    public static RuntimeContext setDS(final DataStore baseline, final String name) {
+    public static RuntimeContext setDS(final DataView baseline, final String name) {
         try {
             get().ds = DataStoreBuilder.of(baseline, name);
         } catch (ExceptionHelper.DataStoreCreateAccessException e) {
@@ -28,7 +25,7 @@ public class RuntimeContext {
         return get();
     }
 
-    public static RuntimeContext setDS(DataStore ds) {
+    public static RuntimeContext setDS(DataView ds) {
         get().ds = ds;
         return get();
     }
@@ -53,7 +50,7 @@ public class RuntimeContext {
         return tlRuntimeContext.get();
     }
 
-    private DataStore ds;
+    private DataView ds;
     private String user;
 
     private static ThreadLocal<RuntimeContext> tlRuntimeContext = new ThreadLocal<RuntimeContext>() {

@@ -5,7 +5,7 @@ package edu.utexas.arlut.ciads;
 import static org.junit.Assert.assertTrue;
 
 import edu.utexas.arlut.ciads.revdb.*;
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import edu.utexas.arlut.ciads.revdb.impl.GitRepository;
 import edu.utexas.arlut.ciads.revdb.main.RuntimeContext;
 import edu.utexas.arlut.ciads.revdb.util.ExceptionHelper;
@@ -30,7 +30,7 @@ public class AppTest1 {
     @Rule
     public TemporaryFolder folder= new TemporaryFolder();
     GitRepository gr;
-    DataStore baseline;
+    DataView baseline;
 
     @Before
     public void setup() throws IOException, ExceptionHelper.DataStoreCreateAccessException {
@@ -56,8 +56,8 @@ public class AppTest1 {
     @Test
     public void testBasicAdd() throws IOException, ExceptionHelper.DataStoreCreateAccessException {
         RuntimeContext.setDS(baseline, "Test").setUser("Wile E. Coyote");
-        DataStore ds = RuntimeContext.getDS();
-        try (DataStore.Transaction tx = ds.beginTX()) {
+        DataView ds = RuntimeContext.getDS();
+        try (DataView.Transaction tx = ds.beginTX()) {
             for (int i = 0; i < 4; i++) {
                 RevDBItem k = TestFrameA.builder("shazam" + i)
                                         .s0("zero" + i)

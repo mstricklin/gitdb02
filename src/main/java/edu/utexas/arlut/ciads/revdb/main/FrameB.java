@@ -1,7 +1,7 @@
 package edu.utexas.arlut.ciads.revdb.main;
 
 import edu.utexas.arlut.ciads.revdb.*;
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
@@ -79,12 +79,12 @@ public class FrameB implements RevDBProxyItem {
     }
     @Override
     public Impl impl() {
-        DataStore ds = RuntimeContext.getDS();
+        DataView ds = RuntimeContext.getDS();
         return (Impl)ds.getImpl(key, FrameB.class);
     }
     @Override
     public Impl mutable() {
-        DataStore ds = RuntimeContext.getDS();
+        DataView ds = RuntimeContext.getDS();
         return (Impl)ds.getImplForMutation(key, FrameB.class);
     }
     // =================================

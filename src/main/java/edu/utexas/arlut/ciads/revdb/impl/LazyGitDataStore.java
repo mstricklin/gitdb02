@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
-public class LazyGitDataStore extends GitDataStore {
+public class LazyGitDataStore extends GitDataView {
     LazyGitDataStore(RevCommit revision, String name) throws IOException {
         super(revision, name);
     }

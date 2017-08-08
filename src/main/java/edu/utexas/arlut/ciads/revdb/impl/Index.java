@@ -61,16 +61,17 @@ public class Index {
         return m;
     }
 
-    // TODO: this is O(n) on the size of the tree in both space and time
+    // TODO: this is O(n) on the size of the tree in both space and time, since
+    // it makes an entry for every element, changed & unchanged
     // a context is about 12201+2756 elements * 30 bytes = ~500k copied, per commit.
     //  doing an actual windowed tree would be more like O(log n) in both space and time
 
-    // one way to do this would be a single persistent DirCache per Index/GitDataStore,
+    // one way to do this would be a single persistent DirCache per Index/GitDataView,
     // then munge it per commit?
     // the best way would be to keep&write only the mutated trees
     ObjectId commit() throws IOException {
-        log.info("Index commit persist {}", addItems.keySet());
-        log.info("Index commit rm  {}", rmItems);
+        log.info("Index commit persist {}", changedItems.keySet());
+        log.info("Index commit rm  {}", deletedItems);
 
         DirCache inCoreIndex = DirCache.newInCore();
         DirCacheBuilder dcb = inCoreIndex.builder();
@@ -79,14 +80,14 @@ public class Index {
         tw.setRecursive(true);
         while (tw.next()) {
             XPath xp = new XPath(tw.getPathString());
-            if (rmItems.contains(xp)) {
+            if (deletedItems.contains(xp)) {
                 continue;
             }
-            if (addItems.containsKey(xp))
+            if (changedItems.containsKey(xp))
                 continue;
             dcb.add(toEntry(tw));
         }
-        for (Map.Entry<XPath, ObjectId> e : addItems.entrySet())
+        for (Map.Entry<XPath, ObjectId> e : changedItems.entrySet())
             dcb.add(toEntry(e.getKey().toString(), e.getValue()));
 
 
@@ -107,14 +108,14 @@ public class Index {
     Index add(ObjectId id, Integer key) {
         XPath p = XPath.of(key);
         log.trace("persist to  {} {} {} => {}", this, key, p, id);
-        addItems.put(p, id);
+        changedItems.put(p, id);
         return this;
     }
 
     Index remove(final Integer key) {
         XPath p = XPath.of(key);
         log.trace("rm from {} {} {}", this, key, p);
-        rmItems.add(p);
+        deletedItems.add(p);
         return this;
     }
 
@@ -125,8 +126,8 @@ public class Index {
 
     void dump() {
         log.info("\t{} dump", this);
-        dumpMap("\t+ {} => {}", addItems);
-        log.info("\t- {}", rmItems);
+        dumpMap("\t+ {} => {}", changedItems);
+        log.info("\t- {}", deletedItems);
     }
 
     // =================================
@@ -134,14 +135,10 @@ public class Index {
     private static final AtomicInteger cnt = new AtomicInteger(0);
     private final int id = cnt.getAndIncrement();
 
-    // TODO: persist a watcher for evictions, to check if we're too small
-    Cache<Integer, ObjectId> index = CacheBuilder.newBuilder()
-                                                 .maximumSize(10000)
-                                                 .build();
-    //    private final GitDataStore datastore;
+    //    private final GitDataView datastore;
     private final RevTree baselineRevTree;
     final GitRepository gr;
 
-    final Map<XPath, ObjectId> addItems = newHashMap();
-    final Set<XPath> rmItems = newHashSet();
+    final Map<XPath, ObjectId> changedItems = newHashMap();
+    final Set<XPath> deletedItems = newHashSet();
 }

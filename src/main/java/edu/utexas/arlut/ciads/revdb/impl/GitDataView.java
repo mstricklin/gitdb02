@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.collect.*;
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import edu.utexas.arlut.ciads.revdb.RevDBItem;
 import edu.utexas.arlut.ciads.revdb.RevDBProxyItem;
 import lombok.extern.slf4j.Slf4j;
@@ -23,12 +23,12 @@ import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
-class GitDataStore implements DataStore {
+class GitDataView implements DataView {
 
-    // one datastore per branch. If "name" isn't already a branch, make it one
+    // one dataview per branch. If "name" isn't already a branch, make it one
     // off of our starting point.
 
-    GitDataStore(GitDataStore startDS, final String name) throws IOException {
+    GitDataView(GitDataView startDS, final String name) throws IOException {
         this.revision = startDS.revision;
         this.name = name;
         gr = GitRepository.instance();
@@ -37,7 +37,7 @@ class GitDataStore implements DataStore {
     }
 
     // TODO: pass in a GitRepository to work off of.
-    GitDataStore(RevCommit revision, final String name) throws IOException {
+    GitDataView(RevCommit revision, final String name) throws IOException {
         this.revision = revision;
         this.name = name;
         gr = GitRepository.instance();
@@ -74,24 +74,25 @@ class GitDataStore implements DataStore {
 
     @Override
     public void shutdown() {
+        // TODO: commit?
         log.info("Shutting down {}", this);
     }
     @Override
     public void dump() {
         log.info("dump {}", this);
         log.info("  = pending =");
-        dumpMap("\t+ {} => {}", added);
-        log.info("\t- {}", deleted);
+        dumpMap("\t+ {} => {}", changedItems);
+        log.info("\t- {}", deletedItems);
         log.info("  = persistent =");
         dumpMap("\t{} => {}", store);
     }
 
     // =================================
     public static class GitTransaction implements Transaction {
-        private GitTransaction(DataStore ds) {
+        private GitTransaction(DataView ds) {
             this.ds = ds;
         }
-        private final DataStore ds;
+        private final DataView ds;
         @Override
         public void close() {
             ds.rollback();
@@ -109,21 +110,21 @@ class GitDataStore implements DataStore {
         return new GitTransaction(this);
     }
     private void reset() {
-        added.clear();
-        deleted.clear();
+        changedItems.clear();
+        deletedItems.clear();
     }
     // commit top-level transaction
     @Override
     public void commit() throws IOException {
-        for (Integer key : deleted) {
+        for (Integer key : deletedItems) {
             index.remove(key);
             store.remove(key);
         }
-        for (Map.Entry<Integer, RevDBItem<?>> e : added.entrySet()) {
+        for (Map.Entry<Integer, RevDBItem<?>> e : changedItems.entrySet()) {
             ObjectId id = gr.persist(e.getValue());
             index.add(id, e.getKey());
         }
-        store.putAll(added);
+        store.putAll(changedItems);
         reset();
 
         ObjectId commitTreeId = index.commit();
@@ -141,8 +142,8 @@ class GitDataStore implements DataStore {
     @Override
     public <T> T persist(RevDBItem<?> k) {
         Integer key = nextKey.getAndIncrement();
-        deleted.remove(key);
-        added.put(key, k);
+        deletedItems.remove(key);
+        changedItems.put(key, k);
         return (T)k.proxyOf(key);
     }
     @Override
@@ -150,19 +151,19 @@ class GitDataStore implements DataStore {
         if (null == p)
             return;
         Integer key = p.getKey();
-        added.remove(key);
-        deleted.add(key);
+        changedItems.remove(key);
+        deletedItems.add(key);
     }
     @Override
     public void remove(Integer key) {
-        added.remove(key);
-        deleted.add(key);
+        changedItems.remove(key);
+        deletedItems.add(key);
     }
     private RevDBItem<?> _getImpl(Integer key, Class<? extends RevDBProxyItem> clazz) {
-        if (deleted.contains(key))
+        if (deletedItems.contains(key))
             return null;
-        if (added.containsKey(key))
-            return added.get(key);
+        if (changedItems.containsKey(key))
+            return changedItems.get(key);
         return store.get(key);
     }
 
@@ -175,8 +176,8 @@ class GitDataStore implements DataStore {
         RevDBItem<?> k2 = _getImpl(key, clazz);
         if (null != k2) {
             k2 = k2.copy();
-            deleted.remove(key);
-            added.put(key, k2);
+            deletedItems.remove(key);
+            changedItems.put(key, k2);
             return k2;
         }
         return null;
@@ -202,7 +203,7 @@ class GitDataStore implements DataStore {
     // =================================
     @Override
     public String toString() {
-        return String.format("GitDataStore %s from %s", name, abbreviate(revision));
+        return String.format("GitDataView %s from %s", name, abbreviate(revision));
     }
     // =================================
 
@@ -218,8 +219,8 @@ class GitDataStore implements DataStore {
     protected Map<Integer, RevDBItem<?>> store = newHashMap();
 
     // transaction workspace
-    private final Map<Integer, RevDBItem<?>> added = newHashMap();
-    private final Set<Integer> deleted = newHashSet();
+    private final Map<Integer, RevDBItem<?>> changedItems = newHashMap();
+    private final Set<Integer> deletedItems = newHashSet();
 
 
 }

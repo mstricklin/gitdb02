@@ -2,7 +2,7 @@ package edu.utexas.arlut.ciads.revdb;
 
 import java.io.IOException;
 
-public interface DataStore {
+public interface DataView {
     void rename(String newName);
 
     void shutdown();

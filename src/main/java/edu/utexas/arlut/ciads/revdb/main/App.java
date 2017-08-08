@@ -1,7 +1,7 @@
 package edu.utexas.arlut.ciads.revdb.main;
 
 import edu.utexas.arlut.ciads.revdb.*;
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import edu.utexas.arlut.ciads.revdb.impl.GitRepository;
 import edu.utexas.arlut.ciads.revdb.util.ExceptionHelper;
 import lombok.extern.slf4j.Slf4j;
@@ -21,15 +21,15 @@ public class App {
         GitRepository gr = DataStoreBuilder.at("t.git");
 
         RevCommit root = gr.getRoot();
-        DataStore baseline = DataStoreBuilder.root();
+        DataView baseline = DataStoreBuilder.root();
 
         RuntimeContext.setDS(baseline, "shazam").setUser("Wile E. Coyote");
         log.info("RuntimeContext {}", RuntimeContext.str());
-        DataStore ds = RuntimeContext.getDS();
+        DataView ds = RuntimeContext.getDS();
 
         // TODO: check on baseline existence, and prime if not
 
-        try (DataStore.Transaction tx = ds.beginTX()) {
+        try (DataView.Transaction tx = ds.beginTX()) {
             for (int i = 0; i < 4; i++) {
                 RevDBItem k = FrameA.builder("shazam" + i)
                                     .s0("zero" + i)
@@ -61,7 +61,7 @@ public class App {
         log.info("RuntimeContext {}", RuntimeContext.str());
         ds = RuntimeContext.getDS();
 
-        try (DataStore.Transaction tx = ds.beginTX()) {
+        try (DataView.Transaction tx = ds.beginTX()) {
             for (int i = 0; i < 3; i++) {
                 RevDBItem k = FrameA.builder("shazam" + i)
                                     .s0("zero" + i)

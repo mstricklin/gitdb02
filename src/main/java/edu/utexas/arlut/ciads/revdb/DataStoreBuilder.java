@@ -19,32 +19,36 @@ public class DataStoreBuilder {
     }
     // =================================
     // create from baseline revdb, or return existing
-    public static DataStore of(final DataStore startingPoint, final String name) throws ExceptionHelper.DataStoreCreateAccessException {
+    public static DataView of(final DataView startingPoint, final String name) throws ExceptionHelper.DataStoreCreateAccessException {
         checkNotNull(startingPoint);
         checkNotNull(name);
         return DataStoreBuilderImpl.of(startingPoint, name);
     }
     // =================================
     // create detached, or return existing
-    public static DataStore detached(final String name) throws ExceptionHelper.DataStoreCreateAccessException {
+    public static DataView detached(final String name) throws ExceptionHelper.DataStoreCreateAccessException {
         checkNotNull(name);
         return DataStoreBuilderImpl.detached(name);
     }
     // =================================
     // get the empty root
-    public static DataStore root() throws ExceptionHelper.DataStoreCreateAccessException {
+    public static DataView root() throws ExceptionHelper.DataStoreCreateAccessException {
         return DataStoreBuilderImpl.root();
     }
     // =================================
     // return existing
-    public static DataStore existing(final String name) throws ExceptionHelper.DataStoreCreateAccessException {
+    public static DataView existing(final String name) throws ExceptionHelper.DataStoreCreateAccessException {
         checkNotNull(name);
         return DataStoreBuilderImpl.existing(name);
     }
     // =================================
-    public void rename(String oldName, String newName) {
+    public static void rename(String oldName, String newName) {
         checkNotNull(oldName);
         checkNotNull(newName);
         DataStoreBuilderImpl.rename(oldName, newName);
+    }
+    // =================================
+    public static Iterable<String> getBranches() {
+        return DataStoreBuilderImpl.getBranches();
     }
 }

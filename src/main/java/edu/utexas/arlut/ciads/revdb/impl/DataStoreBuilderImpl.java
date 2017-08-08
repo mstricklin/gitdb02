@@ -7,17 +7,23 @@ import static edu.utexas.arlut.ciads.revdb.util.ExceptionHelper.createDataStoreC
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
 @Slf4j
 public class DataStoreBuilderImpl {
+
+    // create(baseline, name);
+    // existing(name) -> null|DataView
+    // detached(name) -> DataView
+    // root() -> rootView
 
     public static GitRepository at(File f) throws IOException {
         try {
@@ -29,12 +35,14 @@ public class DataStoreBuilderImpl {
     }
     // =================================
     // create from startingPoint DS, or return existing
-    public static DataStore of(final DataStore startDS, final String name) throws DataStoreCreateAccessException {
+    public static DataView of(final DataView startDV, final String name) throws DataStoreCreateAccessException {
         try {
-            return stores.get(name, new Callable<GitDataStore>() {
+            log.info("Getting or creating '{}' from {}", name, startDV);
+            return stores.get(name, new Callable<GitDataView>() {
                 @Override
-                public GitDataStore call() throws IOException {
-                    return new GitDataStore((GitDataStore)startDS, name);
+                public GitDataView call() throws IOException {
+                    log.info("creating new DataView '{}' from {}", name, startDV);
+                    return new GitDataView((GitDataView)startDV, name);
                 }
             });
         } catch (ExecutionException e) {
@@ -43,9 +51,9 @@ public class DataStoreBuilderImpl {
     }
     // =================================
     // create detached, or return existing
-    public static DataStore detached(final String name) throws DataStoreCreateAccessException {
+    public static DataView detached(final String name) throws DataStoreCreateAccessException {
         checkNotNull(name);
-        DataStore ds = stores.getIfPresent(name);
+        DataView ds = stores.getIfPresent(name);
         if (null == ds) {
             final GitRepository gr = GitRepository.instance();
             return of(root(), name);
@@ -53,13 +61,13 @@ public class DataStoreBuilderImpl {
         return ds;
     }
     // =================================
-    public static GitDataStore root() throws DataStoreCreateAccessException {
-        GitDataStore ds = existing(GitRepository.ROOT_TAG);
+    public static GitDataView root() throws DataStoreCreateAccessException {
+        GitDataView ds = existing(GitRepository.ROOT_TAG);
         if (null != ds)
             return ds;
         try {
             GitRepository gr = GitRepository.instance();
-            GitDataStore root = new LazyGitDataStore(gr.getRoot(), GitRepository.ROOT_TAG);
+            GitDataView root = new LazyGitDataStore(gr.getRoot(), GitRepository.ROOT_TAG);
             stores.put(GitRepository.ROOT_TAG, root);
             return root;
         } catch (IOException e) {
@@ -69,21 +77,31 @@ public class DataStoreBuilderImpl {
     }
     // =================================
     // return existing
-    public static GitDataStore existing(final String name) throws DataStoreCreateAccessException {
+    public static GitDataView existing(final String name) throws DataStoreCreateAccessException {
         checkNotNull(name);
         return stores.getIfPresent(name);
     }
     // =================================
     public static void rename(String oldName, String newName) {
-        GitDataStore ds = stores.getIfPresent(oldName);
+        GitDataView ds = stores.getIfPresent(oldName);
         if (null == ds)
             return; // TODO: throw
         stores.invalidate(newName);
         stores.put(newName, ds);
         ds.rename(newName);
     }
+    // =================================
+    public static Iterable<String> getBranches() {
+        GitRepository gr = GitRepository.instance();
+        try {
+            return gr.allBranches().keySet();
+        } catch (IOException e) {
+            log.error("Error retrieving branches", e);
+            return Collections.emptyList();
+        }
+    }
 
-    private static Cache<String, GitDataStore> stores = CacheBuilder.newBuilder()
-                                                                    .maximumSize(25)
-                                                                    .build();
+    private static Cache<String, GitDataView> stores = CacheBuilder.newBuilder()
+                                                                   .maximumSize(25)
+                                                                   .build();
 }

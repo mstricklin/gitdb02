@@ -1,7 +1,7 @@
 // CLASSIFICATION NOTICE: This file is UNCLASSIFIED
 package edu.utexas.arlut.ciads;
 
-import edu.utexas.arlut.ciads.revdb.DataStore;
+import edu.utexas.arlut.ciads.revdb.DataView;
 import edu.utexas.arlut.ciads.revdb.RevDBProxyItem;
 import edu.utexas.arlut.ciads.revdb.main.RevDBProxiedItem;
 import edu.utexas.arlut.ciads.revdb.main.RuntimeContext;
@@ -85,12 +85,12 @@ public class TestFrameA implements RevDBProxyItem {
 
     @Override
     public Impl impl() {
-        DataStore ds = RuntimeContext.getDS();
+        DataView ds = RuntimeContext.getDS();
         return (Impl)ds.getImpl(key, TestFrameA.class);
     }
     @Override
     public Impl mutable() {
-        DataStore ds = RuntimeContext.getDS();
+        DataView ds = RuntimeContext.getDS();
         return (Impl)ds.getImplForMutation(key, TestFrameA.class);
     }
 
