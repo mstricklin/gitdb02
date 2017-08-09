@@ -22,41 +22,35 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Maps.newLinkedHashMapWithExpectedSize;
 import static edu.utexas.arlut.ciads.revdb.util.Entries.TO_ENTRIES;
 import static edu.utexas.arlut.ciads.revdb.util.ExceptionHelper.*;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
 @Slf4j
 public class GitRepository {
-    private static GitRepository theRepo = null;
     public static final String BASELINE_TAG = "baseline";
     public static final String ROOT_TAG = "ROOT";
     private static final AtomicBoolean hasInited = new AtomicBoolean(false);
 
-    public synchronized static GitRepository init(File f) throws GitAPIException, IOException {
-        if (theRepo != null)
-            return theRepo;
-
+    public synchronized static GitRepository init(File f) throws IOException {
         if (!f.exists()) {
             f.mkdirs();
         } else if (!f.isDirectory())
-            throw new InvalidConfigurationException(f.getAbsolutePath() + " is not a dir");
-        theRepo = new GitRepository(f.getAbsolutePath());
-        if (null == theRepo.getRoot()) {
-            theRepo.addRootCommit();
-        }
-        return theRepo;
-    }
-    public synchronized static GitRepository init(String location) throws GitAPIException, IOException {
-        if (theRepo != null)
+            throw new IOException(f.getAbsolutePath() + " is not a dir");
+        try {
+            GitRepository theRepo = new GitRepository(f.getAbsolutePath());
+            if (null == theRepo.getRoot()) {
+                theRepo.addRootCommit();
+            }
             return theRepo;
-        return init(new File(location));
+        } catch (GitAPIException e) {
+            log.error("Error creating repo at {}", f, e);
+            throw new IOException("Error creating repo at "+f.getAbsolutePath(), e);
+        }
     }
-
-    static GitRepository instance() {
-        if (null == theRepo)
-            throw new ExceptionInInitializerError("GitRepository not initialized");
-        return theRepo;
+    public synchronized static GitRepository init(String location) throws IOException {
+        return init(new File(location));
     }
 
     @Override
@@ -213,7 +207,7 @@ public class GitRepository {
     }
 
     // TODO: parameterize?
-    static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("amt.system", "amt.system@arlut.utexas.edu");
+    static final PersonIdent SYSTEM_PERSON_IDENT = new PersonIdent("revdb.system", "revdb.system@arlut.utexas.edu");
 
     // =================================
     ObjectId persist(RevDBItem k) throws IOException {

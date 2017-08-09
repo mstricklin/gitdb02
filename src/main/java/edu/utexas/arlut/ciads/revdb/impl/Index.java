@@ -105,16 +105,16 @@ public class Index {
         return gr.lookupPath(baselineRevTree, XPath.of(id));
     }
 
-    Index add(ObjectId id, Integer key) {
-        XPath p = XPath.of(key);
-        log.trace("persist to  {} {} {} => {}", this, key, p, id);
-        changedItems.put(p, id);
+    Index add(ObjectId oid, Integer id) {
+        XPath p = XPath.of(id);
+        log.trace("persist to  {} {} {} => {}", this, id, p, oid);
+        changedItems.put(p, oid);
         return this;
     }
 
-    Index remove(final Integer key) {
-        XPath p = XPath.of(key);
-        log.trace("rm from {} {} {}", this, key, p);
+    Index remove(final Integer id) {
+        XPath p = XPath.of(id);
+        log.trace("rm from {} {} {}", this, id, p);
         deletedItems.add(p);
         return this;
     }

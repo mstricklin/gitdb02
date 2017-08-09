@@ -10,5 +10,5 @@ public interface RevDBItem<T> {
 
     RevDBItem<T> copy();
 
-    T proxyOf(Integer key);
+    T proxyOf(Integer id);
 }

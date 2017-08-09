@@ -59,7 +59,7 @@ public class AppTest1 {
         DataView ds = RuntimeContext.getDS();
         try (DataView.Transaction tx = ds.beginTX()) {
             for (int i = 0; i < 4; i++) {
-                RevDBItem k = TestFrameA.builder("shazam" + i)
+                RevDBItem k = TestFrameA.builder(i)
                                         .s0("zero" + i)
                                         .s1("one" + i)
                                         .s2("two" + i)

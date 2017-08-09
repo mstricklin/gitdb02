@@ -6,7 +6,7 @@ import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
 import static edu.utexas.arlut.ciads.revdb.util.Strings.abbreviate;
 import static edu.utexas.arlut.ciads.revdb.util.Strings.dumpMap;
-import static edu.utexas.arlut.ciads.revdb.util.XPath.extractKeyFromPath;
+import static edu.utexas.arlut.ciads.revdb.util.XPath.extractIDFromPath;
 
 import java.io.IOException;
 import java.util.Map;
@@ -17,6 +17,7 @@ import com.google.common.collect.*;
 import edu.utexas.arlut.ciads.revdb.DataView;
 import edu.utexas.arlut.ciads.revdb.RevDBItem;
 import edu.utexas.arlut.ciads.revdb.RevDBProxyItem;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.*;
@@ -25,22 +26,23 @@ import org.eclipse.jgit.revwalk.RevCommit;
 @Slf4j
 class GitDataView implements DataView {
 
-    // one dataview per branch. If "name" isn't already a branch, make it one
-    // off of our starting point.
+    // one dataview per branch.
+    // TODO: throw if "name" isn't a branch
 
-    GitDataView(GitDataView startDS, final String name) throws IOException {
-        this.revision = startDS.revision;
+    GitDataView(GitDataView startDV, final String name) throws IOException {
+        checkNotNull(startDV);
+        this.revision = startDV.revision;
         this.name = name;
-        gr = GitRepository.instance();
+        gr = startDV.gr;
         index = new Index(revision.getTree());
         initialLoad();
     }
 
     // TODO: pass in a GitRepository to work off of.
-    GitDataView(RevCommit revision, final String name) throws IOException {
+    GitDataView(GitRepository gr, RevCommit revision, final String name) throws IOException {
         this.revision = revision;
         this.name = name;
-        gr = GitRepository.instance();
+        this.gr = gr;
         index = new Index(revision.getTree());
         initialLoad();
     }
@@ -49,13 +51,13 @@ class GitDataView implements DataView {
         int max = 0;
         for (DirCacheEntry dce : gr.forAllFiles(revision)) {
             log.info("loading {}", dce);
-            Integer key = extractKeyFromPath(dce.getPathString());
+            Integer id = extractIDFromPath(dce.getPathString());
             RevDBItem k = gr.readObject(dce.getObjectId(), RevDBItem.class);
-            store.put(extractKeyFromPath(dce.getPathString()), k);
-            max = Math.max(max, key);
+            store.put(extractIDFromPath(dce.getPathString()), k);
+            max = Math.max(max, id);
         }
-        nextKey.set(max + 1);
-        log.info("max key {}", nextKey.get());
+        nextId.set(max + 1);
+        log.info("max id {}", nextId.get());
     }
 
     @Override
@@ -116,9 +118,9 @@ class GitDataView implements DataView {
     // commit top-level transaction
     @Override
     public void commit() throws IOException {
-        for (Integer key : deletedItems) {
-            index.remove(key);
-            store.remove(key);
+        for (Integer id : deletedItems) {
+            index.remove(id);
+            store.remove(id);
         }
         for (Map.Entry<Integer, RevDBItem<?>> e : changedItems.entrySet()) {
             ObjectId id = gr.persist(e.getValue());
@@ -140,57 +142,70 @@ class GitDataView implements DataView {
     }
     // =================================
     @Override
+    public <T> T managedInstance(Class<T> clazz) {
+        Integer id = nextId.getAndIncrement();
+        try {
+            T t = clazz.newInstance();
+            deletedItems.remove(id);
+            changedItems.put(id, k);
+            return (T)k.proxyOf(id);
+        } catch (InstantiationException|IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    @Override
     public <T> T persist(RevDBItem<?> k) {
-        Integer key = nextKey.getAndIncrement();
-        deletedItems.remove(key);
-        changedItems.put(key, k);
-        return (T)k.proxyOf(key);
+        Integer id = nextId.getAndIncrement();
+        deletedItems.remove(id);
+        changedItems.put(id, k);
+        return (T)k.proxyOf(id);
     }
     @Override
     public void remove(RevDBProxyItem p) {
         if (null == p)
             return;
-        Integer key = p.getKey();
-        changedItems.remove(key);
-        deletedItems.add(key);
+        Integer id = p.getId();
+        changedItems.remove(id);
+        deletedItems.add(id);
     }
     @Override
-    public void remove(Integer key) {
-        changedItems.remove(key);
-        deletedItems.add(key);
+    public void remove(Integer id) {
+        changedItems.remove(id);
+        deletedItems.add(id);
     }
-    private RevDBItem<?> _getImpl(Integer key, Class<? extends RevDBProxyItem> clazz) {
-        if (deletedItems.contains(key))
+    private RevDBItem<?> _getImpl(Integer id, Class<? extends RevDBProxyItem> clazz) {
+        if (deletedItems.contains(id))
             return null;
-        if (changedItems.containsKey(key))
-            return changedItems.get(key);
-        return store.get(key);
+        if (changedItems.containsKey(id))
+            return changedItems.get(id);
+        return store.get(id);
     }
 
     @Override
-    public RevDBItem<?> getImpl(Integer key, Class<? extends RevDBProxyItem> clazz) {
-        return _getImpl(key, clazz);
+    public RevDBItem<?> getImpl(Integer id, Class<? extends RevDBProxyItem> clazz) {
+        return _getImpl(id, clazz);
     }
     @Override
-    public RevDBItem<?> getImplForMutation(Integer key, Class<? extends RevDBProxyItem> clazz) {
-        RevDBItem<?> k2 = _getImpl(key, clazz);
+    public RevDBItem<?> getImplForMutation(Integer id, Class<? extends RevDBProxyItem> clazz) {
+        RevDBItem<?> k2 = _getImpl(id, clazz);
         if (null != k2) {
             k2 = k2.copy();
-            deletedItems.remove(key);
-            changedItems.put(key, k2);
+            deletedItems.remove(id);
+            changedItems.put(id, k2);
             return k2;
         }
         return null;
     }
     @Override
-    public <T> T get(Integer key, Class<? extends RevDBProxyItem> clazz) {
-        RevDBItem<?> k2 = _getImpl(key, clazz);
-        return (null == k2) ? null : (T)k2.proxyOf(key);
+    public <T> T get(Integer id, Class<? extends RevDBProxyItem> clazz) {
+        RevDBItem<?> k2 = _getImpl(id, clazz);
+        return (null == k2) ? null : (T)k2.proxyOf(id);
     }
     @Override
-    public <T> T getForMutation(Integer key, Class<? extends RevDBProxyItem> clazz) {
-        RevDBItem<?> k2 = getImplForMutation(key, clazz);
-        return (null == k2) ? null : (T)k2.proxyOf(key);
+    public <T> T getForMutation(Integer id, Class<? extends RevDBProxyItem> clazz) {
+        RevDBItem<?> k2 = getImplForMutation(id, clazz);
+        return (null == k2) ? null : (T)k2.proxyOf(id);
     }
     @Override
     public Iterable<? extends RevDBItem> list() {
@@ -211,7 +226,7 @@ class GitDataView implements DataView {
     protected String name;
     protected GitRepository gr;
     protected RevCommit revision;
-    private static final AtomicInteger nextKey = new AtomicInteger(0);
+    private static final AtomicInteger nextId = new AtomicInteger(0);
 
     protected Index index;
 

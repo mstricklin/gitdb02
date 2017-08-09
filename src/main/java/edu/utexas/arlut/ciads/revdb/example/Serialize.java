@@ -26,7 +26,7 @@ public class Serialize {
 //        m.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
 //        m.enableDefaultTypingAsProperty(ObjectMapper.DefaultTyping.NON_FINAL, "@class");
 //        m.writeTree();
-        m.addMixIn(AI.class, KeyMixin.class);
+        m.addMixIn(AI.class, IdMixin.class);
         m.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
         A a0 = new A("0One", "0Two", "0Three");
@@ -36,8 +36,8 @@ public class Serialize {
 //        JsonNode tree = mapper.valueToTree(value);
 
         ObjectWriter writer = m.writerFor(AI.class);
-//                               .withAttribute("key", 27);
-        String s1 = writer.withAttribute("key", 28).writeValueAsString(a0);
+//                               .withAttribute("id", 27);
+        String s1 = writer.withAttribute("id", 28).writeValueAsString(a0);
         log.info("s1 {}", s1);
 
                 A a1 = get(s1);
@@ -46,16 +46,16 @@ public class Serialize {
 
     @JsonAppend(
             attrs = {
-                    @JsonAppend.Attr(value = "key")
+                    @JsonAppend.Attr(value = "id")
             }
     )
-//    @JsonIgnoreProperties(value={ "key" }, allowSetters=true)
+//    @JsonIgnoreProperties(value={ "id" }, allowSetters=true)
     @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY, property="@class")
-    public abstract static class KeyMixin {
+    public abstract static class IdMixin {
         @JsonIgnore
-        private String key;
+        private Integer id;
         @JsonIgnore
-        public abstract void setKey(String k);
+        public abstract void setId(String k);
     }
 
     static <T extends AI> T get(String s) throws IOException {

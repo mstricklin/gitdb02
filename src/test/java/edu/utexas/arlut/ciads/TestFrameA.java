@@ -12,18 +12,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TestFrameA implements RevDBProxyItem {
 
-    public final Integer key;
+    public final Integer id;
     public static final String TYPE_VALUE = "FrameA";
 
-    public static Builder builder(String id) {
+    public static Builder builder(Integer id) {
         return new Builder(id);
     }
     public static class Builder {
-        private String id;
+        private Integer id;
         private String s0 = "";
         private String s1 = "";
         private String s2 = "";
-        private Builder(String id) {
+        private Builder(Integer id) {
             this.id = id;
         }
         public Builder s0(String s0) {
@@ -42,11 +42,11 @@ public class TestFrameA implements RevDBProxyItem {
             return new Impl(id, s0, s1, s2);
         }
     }
-    public static TestFrameA create(Integer key) {
-        return new TestFrameA(key);
+    public static TestFrameA create(Integer id) {
+        return new TestFrameA(id);
     }
-    private TestFrameA(Integer key) {
-        this.key = key;
+    private TestFrameA(Integer id) {
+        this.id = id;
     }
 
 
@@ -78,20 +78,20 @@ public class TestFrameA implements RevDBProxyItem {
         return TYPE_VALUE;
     }
     @Override
-    public Integer getKey() {
-        return key;
+    public Integer getId() {
+        return id;
     }
 
 
     @Override
     public Impl impl() {
         DataView ds = RuntimeContext.getDS();
-        return (Impl)ds.getImpl(key, TestFrameA.class);
+        return (Impl)ds.getImpl(id, TestFrameA.class);
     }
     @Override
     public Impl mutable() {
         DataView ds = RuntimeContext.getDS();
-        return (Impl)ds.getImplForMutation(key, TestFrameA.class);
+        return (Impl)ds.getImplForMutation(id, TestFrameA.class);
     }
 
     @Override
@@ -101,7 +101,7 @@ public class TestFrameA implements RevDBProxyItem {
 
     @Override
     public String toString() {
-        return Integer.toString(key) + "=" + impl().toString();
+        return Integer.toString(id) + "=" + impl().toString();
     }
 
     // this is a morally immutable class
@@ -117,7 +117,7 @@ public class TestFrameA implements RevDBProxyItem {
             super();
         }
 
-        Impl(String id, String s0, String s1, String s2) {
+        Impl(Integer id, String s0, String s1, String s2) {
             super(id);
             this.s0 = s0;
             this.s1 = s1;
@@ -134,8 +134,8 @@ public class TestFrameA implements RevDBProxyItem {
         }
 
         @Override
-        public TestFrameA proxyOf(Integer key) {
-            return new TestFrameA(key);
+        public TestFrameA proxyOf(Integer id) {
+            return new TestFrameA(id);
         }
 
     }

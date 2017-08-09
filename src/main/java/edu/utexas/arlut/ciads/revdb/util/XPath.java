@@ -5,6 +5,7 @@ import com.google.common.base.Joiner;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.primitives.Ints;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -17,21 +18,19 @@ public class XPath {
     public static final String PATH_SEPARATOR = "/";
     public static final Joiner pathJoiner = Joiner.on(PATH_SEPARATOR);
 
-    public static Integer extractKeyFromPath(String path) {
+    public static Integer extractIDFromPath(String path) {
         int li = 1 + path.lastIndexOf('/');
         String subP = path.substring(li);
         return Integer.parseInt(subP, 16);
     }
 
-    public static XPath of(int key) {
-        return pathCache.getUnchecked(key);
+    public static XPath of(int id) {
+        return pathCache.getUnchecked(id);
     }
-    public XPath(int key) {
+    public XPath(int id) {
+        byte[] b = Ints.toByteArray(id);
         path = String.format("%02x/%02x/%02x/%08x",
-                             (byte) ((key & 0xFF000000) >> 24),
-                             (byte) ((key & 0xFF000000) >> 16),
-                             (byte) ((key & 0xFF000000) >> 8),
-                             key);
+                             b[0], b[1], b[2], id);
     }
 
     public XPath(String first, String... more) {
@@ -93,8 +92,8 @@ public class XPath {
                           .maximumSize(1000)
                           .build(
                                   new CacheLoader<Integer, XPath>() {
-                                      public XPath load(Integer key) {
-                                          return new XPath(key);
+                                      public XPath load(Integer id) {
+                                          return new XPath(id);
                                       }
                                   });
 }

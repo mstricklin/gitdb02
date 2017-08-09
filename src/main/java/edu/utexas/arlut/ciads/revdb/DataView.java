@@ -21,19 +21,21 @@ public interface DataView {
     void rollback();
 
     // =================================
+    <T> T managedInstance(Class<T> clazz);
+
     <T> T persist(RevDBItem<?> k);
 
     void remove(RevDBProxyItem p);
 
-    void remove(Integer key);
+    void remove(Integer id);
 
-    RevDBItem<?> getImpl(Integer key, Class<? extends RevDBProxyItem> clazz);
+    RevDBItem<?> getImpl(Integer id, Class<? extends RevDBProxyItem> clazz);
 
-    RevDBItem<?> getImplForMutation(Integer key, Class<? extends RevDBProxyItem> clazz);
+    RevDBItem<?> getImplForMutation(Integer id, Class<? extends RevDBProxyItem> clazz);
 
-    <T> T get(Integer key, Class<? extends RevDBProxyItem> clazz);
+    <T> T get(Integer id, Class<? extends RevDBProxyItem> clazz);
 
-    <T> T getForMutation(Integer key, Class<? extends RevDBProxyItem> clazz);
+    <T> T getForMutation(Integer id, Class<? extends RevDBProxyItem> clazz);
 
     Iterable<? extends RevDBItem> list();
 

@@ -28,14 +28,17 @@ public class DataStoreBuilderImpl {
     public static GitRepository at(File f) throws IOException {
         try {
             return GitRepository.init(f);
-        } catch (GitAPIException | IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
             throw new IOException("Cannot create GitRepository at" + f, e);
         }
     }
     // =================================
-    // create from startingPoint DS, or return existing
-    public static DataView of(final DataView startDV, final String name) throws DataStoreCreateAccessException {
+
+    // =================================
+    // create from startDV D.V., or return existing
+    public static DataView createOrGet(final DataView startDV, final String name) throws DataStoreCreateAccessException {
+        // TODO; make a branch on create
         try {
             log.info("Getting or creating '{}' from {}", name, startDV);
             return stores.get(name, new Callable<GitDataView>() {
@@ -55,8 +58,7 @@ public class DataStoreBuilderImpl {
         checkNotNull(name);
         DataView ds = stores.getIfPresent(name);
         if (null == ds) {
-            final GitRepository gr = GitRepository.instance();
-            return of(root(), name);
+            return createOrGet(root(), name);
         }
         return ds;
     }
@@ -67,7 +69,7 @@ public class DataStoreBuilderImpl {
             return ds;
         try {
             GitRepository gr = GitRepository.instance();
-            GitDataView root = new LazyGitDataStore(gr.getRoot(), GitRepository.ROOT_TAG);
+            GitDataView root = new LazyGitDataView(gr.getRoot(), GitRepository.ROOT_TAG);
             stores.put(GitRepository.ROOT_TAG, root);
             return root;
         } catch (IOException e) {

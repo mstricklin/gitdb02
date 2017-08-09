@@ -3,7 +3,7 @@ package edu.utexas.arlut.ciads.revdb;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import edu.utexas.arlut.ciads.revdb.impl.DataStoreBuilderImpl;
-import edu.utexas.arlut.ciads.revdb.impl.GitRepository;
+import edu.utexas.arlut.ciads.revdb.impl.DataStoreManagerImpl;
 import edu.utexas.arlut.ciads.revdb.util.ExceptionHelper;
 
 import java.io.File;
@@ -11,18 +11,22 @@ import java.io.IOException;
 
 public class DataStoreBuilder {
 
-    public static GitRepository at(File f) throws IOException {
-        return DataStoreBuilderImpl.at(f);
+    public static DataStoreManager at(File location) throws IOException {
+        return new DataStoreManagerImpl(location);
     }
-    public static GitRepository at(String location) throws IOException {
-        return at(new File(location));
-    }
+
+//    public static GitRepository at(File f) throws IOException {
+//        return DataStoreBuilderImpl.at(f);
+//    }
+//    public static GitRepository at(String location) throws IOException {
+//        return at(new File(location));
+//    }
     // =================================
     // create from baseline revdb, or return existing
-    public static DataView of(final DataView startingPoint, final String name) throws ExceptionHelper.DataStoreCreateAccessException {
+    public static DataView createOrGet(final DataView startingPoint, final String name) throws ExceptionHelper.DataStoreCreateAccessException {
         checkNotNull(startingPoint);
         checkNotNull(name);
-        return DataStoreBuilderImpl.of(startingPoint, name);
+        return DataStoreBuilderImpl.createOrGet(startingPoint, name);
     }
     // =================================
     // create detached, or return existing

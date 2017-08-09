@@ -11,8 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 @Slf4j
-public class LazyGitDataStore extends GitDataView {
-    LazyGitDataStore(RevCommit revision, String name) throws IOException {
+public class LazyGitDataView extends GitDataView {
+    LazyGitDataView(RevCommit revision, String name) throws IOException {
         super(revision, name);
     }
 
@@ -37,24 +37,24 @@ public class LazyGitDataStore extends GitDataView {
         super.commit();
     }
     @Override
-    public RevDBItem<?> getImpl(Integer key, Class<? extends RevDBProxyItem> clazz) {
+    public RevDBItem<?> getImpl(Integer id, Class<? extends RevDBProxyItem> clazz) {
         prime();
-        return super.getImpl(key, clazz);
+        return super.getImpl(id, clazz);
     }
     @Override
-    public RevDBItem<?> getImplForMutation(Integer key, Class<? extends RevDBProxyItem> clazz) {
+    public RevDBItem<?> getImplForMutation(Integer id, Class<? extends RevDBProxyItem> clazz) {
         prime();
-        return super.getImplForMutation(key, clazz);
+        return super.getImplForMutation(id, clazz);
     }
     @Override
-    public <T> T get(Integer key, Class<? extends RevDBProxyItem> clazz) {
+    public <T> T get(Integer id, Class<? extends RevDBProxyItem> clazz) {
         prime();
-        return super.get(key, clazz);
+        return super.get(id, clazz);
     }
     @Override
-    public <T> T getForMutation(Integer key, Class<? extends RevDBProxyItem> clazz) {
+    public <T> T getForMutation(Integer id, Class<? extends RevDBProxyItem> clazz) {
         prime();
-        return super.getForMutation(key, clazz);
+        return super.getForMutation(id, clazz);
     }
     @Override
     public Iterable<? extends RevDBItem> list() {
@@ -69,7 +69,7 @@ public class LazyGitDataStore extends GitDataView {
     // =================================
     @Override
     public String toString() {
-        return String.format("LazyGitDataStore %s from %s", name, abbreviate(revision));
+        return String.format("LazyGitDataView %s from %s", name, abbreviate(revision));
     }
     // =================================
 

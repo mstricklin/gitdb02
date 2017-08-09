@@ -6,21 +6,19 @@ import edu.utexas.arlut.ciads.revdb.RevDBItem;
 public abstract class RevDBProxiedItem<T> implements RevDBItem<T> {
     // for serializer reconstruction
     protected RevDBProxiedItem() {
-        id = "";
+        id = -1;
     }
-    protected RevDBProxiedItem(String id) {
+    protected RevDBProxiedItem(Integer id) {
         this.id = id;
     }
-    public String getId() {
+    public Integer getId() {
         return id;
     }
     @Override
     abstract public String getType();
 
     @Override
-    abstract public T proxyOf(Integer key);
+    abstract public T proxyOf(Integer id);
 
-    // named __id for historical reasons
-//    @JsonProperty("__id")
-    public final String id;
+    public final Integer id;
 }

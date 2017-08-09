@@ -6,5 +6,5 @@ public interface RevDBProxyItem {
     RevDBItem mutable();
     Class<?> proxiedClass(); // TODO: rm?
     String getType();
-    Integer getKey();
+    Integer getId();
 }

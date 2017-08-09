@@ -11,7 +11,7 @@ public class App3 {
     public static void main(String[] args) {
         log.info("App3");
 
-        RevDBItem k0 = FrameA.builder("shazam").s0("zero").s1("one").s2("two").build();
+        RevDBItem k0 = FrameA.builder(7).s0("zero").s1("one").s2("two").build();
 //        FrameA fa0 = ds.persist(k0);
         log.info("k0 {}", k0);
 
@@ -21,11 +21,11 @@ public class App3 {
 //        log.info("{}", new String(b));
 
         String p = "00/00/00/00000017";
-        getKey(p);
+        getId(p);
 
     }
 
-    static Integer getKey(String p) {
+    static Integer getId(String p) {
         int lI = 1+p.lastIndexOf('/');
         String subP = p.substring(lI);
         log.info("{} => {}", p, subP);

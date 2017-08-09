@@ -31,7 +31,7 @@ public class App {
 
         try (DataView.Transaction tx = ds.beginTX()) {
             for (int i = 0; i < 4; i++) {
-                RevDBItem k = FrameA.builder("shazam" + i)
+                RevDBItem k = FrameA.builder(i)
                                     .s0("zero" + i)
                                     .s1("one" + i)
                                     .s2("two" + i)
@@ -63,7 +63,7 @@ public class App {
 
         try (DataView.Transaction tx = ds.beginTX()) {
             for (int i = 0; i < 3; i++) {
-                RevDBItem k = FrameA.builder("shazam" + i)
+                RevDBItem k = FrameA.builder(i)
                                     .s0("zero" + i)
                                     .s1("one" + i)
                                     .s2("two" + i)
